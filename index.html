@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ForgePanemulation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- 1. 初期スタート画面 -->
+    <div id="start-screen">
+        <h1>CONTROL PANEL BUILDER</h1>
+        <button class="btn" id="create-btn">⚡ 新規制御盤を設計する</button>
+    </div>
+
+    <!-- 2. 銘板・初期設定メニュー -->
+    <div id="menu-modal">
+        <h2>ForgePanemulation - 制御盤設計仕様</h2>
+        <div class="form-group">
+            <label>盤の名称 (銘板に刻印)</label>
+            <input type="text" id="panel-name" value="MAIN CONTROL PANEL">
+        </div>
+        <div class="form-group">
+            <label>主回路電圧</label>
+            <select id="panel-voltage">
+                <option value="AC 200V">AC 200V (三相)</option>
+                <option value="AC 100V" selected>AC 100V (単相)</option>
+                <option value="DC 24V">DC 24V</option>
+            </select>
+        </div>
+        <button class="btn" id="build-btn" style="width:100%;">この設定で盤を製造する 🛠️</button>
+    </div>
+
+    <!-- 3. メインの制御盤パネル画面 -->
+    <div id="workspace">
+        <div id="canvas-container">
+            <canvas id="panelCanvas" width="800" height="550"></canvas>
+        </div>
+        <div class="toolbar">
+            <button class="btn" id="view-btn">🔓 中を開ける</button>
+            <button class="btn" id="add-relay-btn" style="display:none;">+ リレーを追加</button>
+            <button class="btn" id="add-switch-btn" style="display:none;">+ スイッチを追加</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
