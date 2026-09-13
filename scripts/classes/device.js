@@ -12,13 +12,9 @@ export class ControlDevice {
         if (this.type === 'relay') { 
             this.width = 55; this.height = 115; this.color = '#1e252b'; this.name = 'DYF14A SOCKET'; 
             this.terminals = [
-                // 4段目（一番上の段 - 3極）
                 {name:"5 (1-NO)"},{name:"6 (2-NO)"},{name:"7 (3-NO)"},
-                // 3段目（上から二段目 - 4極）
                 {name:"8 (4-NO)"},{name:"1 (1-NC)"},{name:"2 (2-NC)"},{name:"3 (3-NC)"},
-                // 2段目（下から二段目 - 4極）
                 {name:"4 (4-NC)"},{name:"9 (1-COM)"},{name:"10 (2-COM)"},{name:"11 (3-COM)"},
-                // 1段目（一番下の段 - 3極）
                 {name:"12 (4-COM)"},{name:"13 (-)"},{name:"14 (+)"}
             ]; 
         } 
@@ -51,14 +47,19 @@ export class ControlDevice {
                 selector_sw: [3, '#2c3e50', 'MANU/AUTO'], lamp_selector: [4, '#2c3e50', 'MODE'], key_switch: [5, '#2c3e50', 'LOCK'],
                 buzzer: [6, '#34495e', 'ALARM'], analog_meter: [7, '#2f3542', 'CURRENT'], digital_controller: [8, '#1e252b', 'TEMP CTRL'], panel_timer: [9, '#3d464d', 'DELAY T'], emergency_stop: [12, '#d63031', 'EMO STOP']
             };
-            const s = specs[this.type] || [0, '#2ecc71', 'SPARE']; this.typeIndex = s; this.color = s; this.name = this.type.toUpperCase(); if(!this.extraConfig.label) this.label = s;
+            const s = specs[this.type] || [0, '#2ecc71', 'SPARE']; 
+            // ★【バグ修正の大本命】配列から要素を正しくインデックス抽出して、型式番号とカラーを復元！
+            this.typeIndex = s[0]; 
+            this.color = s[1]; 
+            this.name = this.type.toUpperCase(); 
+            if(!this.extraConfig.label) this.label = s[2];
+            
             if (this.type === 'analog_meter') { this.width = 80; this.height = 80; this.unit = this.extraConfig.unit || "A"; }
             else if (this.type === 'digital_controller') { this.width = 72; this.height = 72; this.unit = this.extraConfig.unit || "℃"; }
             else if (this.type === 'panel_timer') { this.width = 72; this.height = 72; this.timeUnit = this.extraConfig.timeUnit || "sec"; this.timerMode = this.extraConfig.timerMode || "ON-Delay"; }
         }
     }
     
-    // ★【修正パッチ】上から3番目の段（COM段）のY座標を中央スロットの下側（y + 74）へ安全に引き下げ！
     getTerminalCoords(index) {
         if (this.type === 'terminal_block') return { x: this.x + 25 + (Math.floor(index / 2) * 30), y: (index % 2 === 1) ? this.y + this.height - 15 : this.y + 15 };
         if (this.type === 'breaker') return { x: this.x + 17 + (Math.floor(index / 2) * 35), y: (index % 2 === 1) ? this.y + this.height - 12 : this.y + 12 };
@@ -67,25 +68,19 @@ export class ControlDevice {
         if (this.type === 'contact_block' && this.extraConfig?.isEMO) return [{ x: this.x + 10, y: this.y + 10 }, { x: this.x + 10, y: this.y + 22 }, { x: this.x + 35, y: this.y + 10 }, { x: this.x + 35, y: this.y + 22 }, { x: this.x + 22, y: this.y + 42 }, { x: this.x + 22, y: this.y + 50 }][index];
         if (this.type === 'contact_block') return { x: this.x + this.width / 2, y: (index === 0) ? this.y + 10 : this.y + this.height - 10 };
         
-        // ★【DYF14A実機完全再現】3層スロット幅を考慮した綺麗なY軸等間隔ステップ配置
         if (this.type === 'relay') {
-            // 4段目（NO段 - 3極）
             if (index >= 0 && index <= 2) return { x: this.x + 16 + (index * 11.5), y: this.y + 14 };
-            // 3段目（NC段 - 4極）
             if (index >= 3 && index <= 6) return { x: this.x + 10 + ((index - 3) * 11.5), y: this.y + 32 };
-            // 2段目（COM段 - 4極） -> ★めり込みを解消し、中央スロットを跨いだ「y + 74」のリアルな位置へ引き下げ！
             if (index >= 7 && index <= 10) return { x: this.x + 10 + ((index - 7) * 11.5), y: this.y + 74 };
-            // 1段目（コイル段 - 3極） -> 最下段「y + 94」に綺麗に収める
             if (index >= 11 && index <= 13) return { x: this.x + 16 + ((index - 11) * 11.5), y: this.y + this.height - 15 };
         }
         
-        // 富士電機SC-5-1型 3層マッピング
         if (this.type === 'contactor') {
             if (index === 0) return { x: this.x + 29, y: this.y + 12 }; if (index === 1) return { x: this.x + 56, y: this.y + 12 };
             if (index >= 2 && index <= 6) return { x: this.x + 12 + ((index - 2) * 15.2), y: this.y + 25 };
             if (index >= 7 && index <= 11) return { x: this.x + 12 + ((index - 7) * 15.2), y: this.y + this.height - 12 };
         }
-        return [{ x: this.x + 15, y: this.y + 8 }, { x: this.x + this.width - 15, y: this.y + 8 }, { x: this.x + 15, y: this.y + this.height - 8 }, { x: this.x + this.width - 15, y: this.y + this.height - 8 }][index];
+        return [{ x: this.x + 15, y: this.y + 8 }, { x: this.x + this.width - 15, y: this.y + 8 }, { x: this.x + 15, y: this.y + 8 - d.height }, { x: this.x + this.width - 15, y: this.y + 8 - d.height }][index];
     }
     checkTerminalClick(mx, my) {
         for (let i = 0; i < this.terminals.length; i++) { if (Math.hypot(mx - this.getTerminalCoords(i).x, my - this.getTerminalCoords(i).y) < 8) return i; }
