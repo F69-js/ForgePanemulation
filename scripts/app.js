@@ -1,4 +1,4 @@
-import { currentMode, isAnimating, toggleDoorMode, updateDoorProgress, syncDevicePositions, doorOpenProgress } from './logic.js';
+import { currentMode, isAnimating, toggleDoorMode, updateDoorProgress, syncDevicePositions, doorOpenProgress, snapToClosestRail } from './logic.js';
 import { updateButtonStates, showAddDeviceMenu, showSelectedDeviceMenu, clearRightMenu } from './ui.js';
 import { drawAll } from './draw.js';
 import { ControlDevice } from './classes/device.js';
@@ -13,7 +13,7 @@ let panelConfig = { name: "", phase: "" };
 let devices = [];
 let wires = [];
 
-// ★【新仕様】多段化DINレールを保持する配列管理へ変更（初期配置で1本目を登録）
+// 多段化DINレール配列（初期位置で1本目を登録）
 let dinRails = [{ id: 1, y: 240, height: 40 }];
 
 let draggedDevice = null;
@@ -67,7 +67,7 @@ if (viewBtn) {
     });
 }
 
-// ★【新仕様】「➕ DINレールを追加」ボタンのイベント
+// 「➕ DINレールを追加」ボタンのイベント
 const addRailBtn = document.getElementById('add-rail-btn');
 if (addRailBtn) {
     addRailBtn.addEventListener('click', () => {
@@ -85,18 +85,15 @@ if (addRailBtn) {
     });
 }
 
-// ★【新仕様】トビラ機器を追加ボタン (配置前に右メニューでバインディング設定を待つ仕様へ大改修)
+// トビラ機器を追加ボタン (配置前バインディング仕様)
 const addExtBtn = document.getElementById('add-ext-device-btn');
 if (addExtBtn) {
     addExtBtn.addEventListener('click', () => {
         const selectType = document.getElementById('select-ext-type').value;
         
-        // 配置パーツを生成する前に、まず右メニューのプレエディタを強制発動！
         showAddDeviceMenu(selectType, (config) => {
-            // 右メニューで「配置 🛠️」が押されたら、初めて指定された文字や色を反映して召喚
             const newDevice = new ControlDevice(Date.now(), selectType, 100, 150, config);
             
-            // configから受け取った色や銘板を上書き設定
             if (config.color) newDevice.color = config.color;
             if (config.label) newDevice.label = config.label;
             
@@ -116,7 +113,7 @@ if (addRelayBtn) {
     });
 }
 
-// 可変端子台を追加ボタン (配置前の極数指定を反映)
+// 可変端子台を追加ボタン
 const addTerminalBtn = document.getElementById('add-terminal-btn');
 if (addTerminalBtn) {
     addTerminalBtn.addEventListener('click', () => {
@@ -142,7 +139,6 @@ function animateLoop() {
 
 function draw() {
     if (ctx && canvas) {
-        // ★修正：第8引数に多段化されたレール配列「dinRails」を確実に渡す
         drawAll(ctx, canvas, panelConfig, devices, wires, activeWiring, hoveredTerminal, dinRails);
     }
 }
@@ -172,7 +168,6 @@ function handleMouseDown(e) {
         }
     }
     if (hitDevice) {
-        // 配置済みパーツをクリックした際、変更があったら即再描画するトリガー(draw)を渡す
         showSelectedDeviceMenu(hitDevice, (idToDelete) => {
             devices = devices.filter(d => d.id !== idToDelete);
             wires = wires.filter(w => w.fromNode.id !== idToDelete && w.toNode.id !== idToDelete);
@@ -189,10 +184,8 @@ function handleMouseMove(e) {
     if (draggedDevice) {
         let tx = mx - offsetX, ty = my - offsetY;
         if (currentMode === "interior" && draggedDevice.type !== 'switch') {
-            // ★仮のスナップ処理（現在は1本目のレールに固定。次の段で全レールをスキャンするlogic.jsへ移行します）
-            if (Math.abs((ty + draggedDevice.height / 2) - (dinRails[0].y + dinRailHeight / 2)) < 40) {
-                ty = (dinRails[0].y + dinRailHeight / 2) - draggedDevice.height / 2;
-            }
+            // ★【修正】logic.jsに増設した多段スナップエンジンを呼び出し、最も近いレールに吸着させる！
+            ty = snapToClosestRail(draggedDevice, dinRails, ty);
         }
         draggedDevice.x = tx; draggedDevice.y = ty;
         syncDevicePositions(draggedDevice, devices);
