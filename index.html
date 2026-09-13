@@ -30,19 +30,16 @@
         <button class="btn" id="build-btn" style="width:100%;">盤を製造する 🛠️</button>
     </div>
 
-    <!-- 3. メインの制御盤パネル画面 (Canvasと右メニューの横並び) -->
+    <!-- 3. メインの制御盤パネル画面 -->
     <div id="workspace">
         <div id="workspace-container">
             <div id="canvas-container">
                 <canvas id="panelCanvas" width="800" height="550"></canvas>
             </div>
-            
-            <!-- ★右側の可変詳細設定メニュー -->
             <div id="right-menu">
                 <h3>機器詳細設定</h3>
-                <!-- JavaScriptから中身を可変させるための重要な動的コンテナ -->
                 <div id="menu-content">
-                    <p style="color: #bdc3c7; font-size: 0.9rem;">パーツを選択すると、ここに詳細な設定メニューが動的に生成されます。</p>
+                    <p style="color: #bdc3c7; font-size: 0.9rem;">パーツを選択すると詳細メニューが出現します。</p>
                 </div>
             </div>
         </div>
@@ -64,8 +61,9 @@
                 <button class="btn" id="add-ext-device-btn">+ トビラ機器を追加</button>
             </div>
             
-            <!-- 盤内用パーツグループ -->
+            <!-- 盤内用パーツグループ (★レール追加ボタンを新設) -->
             <div id="int-tools" style="display: none; gap: 8px;">
+                <button class="btn" id="add-rail-btn" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">➕ DINレールを追加</button>
                 <button class="btn" id="add-relay-btn">+ リレーを追加</button>
                 <button class="btn" id="add-terminal-btn">+ 可変端子台を追加</button>
             </div>
