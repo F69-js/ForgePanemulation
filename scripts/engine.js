@@ -99,21 +99,35 @@ function runSequenceSimulation() {
                 
                 let rON = previousExcitedCoils.has(currentDevice.id);
                 
-                if (curr.terminalIndex === 8) { reachableLocalTerminals.push(rON ? 0 : 4); }
-                else if (curr.terminalIndex === 0) { if (rON) reachableLocalTerminals.push(8); }
-                else if (curr.terminalIndex === 4) { if (!rON) reachableLocalTerminals.push(8); }
+                if (curr.terminalIndex === 8) {
+                    if (rON) { reachableLocalTerminals.push(0); } else { reachableLocalTerminals.push(4); }
+                } else if (curr.terminalIndex === 0) {
+                    if (rON) reachableLocalTerminals.push(8);
+                } else if (curr.terminalIndex === 4) {
+                    if (!rON) reachableLocalTerminals.push(8);
+                }
                 
-                if (curr.terminalIndex === 9) { reachableLocalTerminals.push(rON ? 1 : 5); }
-                else if (curr.terminalIndex === 1) { if (rON) reachableLocalTerminals.push(9); }
-                else if (curr.terminalIndex === 5) { if (!rON) reachableLocalTerminals.push(9); }
+                if (curr.terminalIndex === 9) {
+                    if (rON) { reachableLocalTerminals.push(1); } else { reachableLocalTerminals.push(5); }
+                } else if (curr.terminalIndex === 1) {
+                    if (rON) reachableLocalTerminals.push(9);
+                } else if (curr.terminalIndex === 5) {
+                    if (!rON) reachableLocalTerminals.push(9);
+                }
                 
-                if (curr.terminalIndex === 10) { reachableLocalTerminals.push(rON ? 2 : 6); }
-                else if (curr.terminalIndex === 2) { if (rON) reachableLocalTerminals.push(10); }
-                else if (curr.terminalIndex === 6) { if (!rON) reachableLocalTerminals.push(10); }
+                if (curr.terminalIndex === 10) {
+                    if (rON) { reachableLocalTerminals.push(2); } else { reachableLocalTerminals.push(6); }
+                } else if (curr.terminalIndex === 2) {
+                    if (rON) reachableLocalTerminals.push(10);
+                } else if (curr.terminalIndex === 6) {
+                    if (!rON) reachableLocalTerminals.push(10);
+                }
 
-                // ★【大改修の核心】4回路目の NO接点（7-3間）に、しっかりと rON (リレーONの時だけ開通) 条件を完全付与して短絡バグを撃破！
-                if (curr.terminalIndex === 7) { if (rON) reachableLocalTerminals.push(3); }
-                else if (curr.terminalIndex === 3) { if (rON) reachableLocalTerminals.push(7); }
+                if (curr.terminalIndex === 7) {
+                    if (rON) { reachableLocalTerminals.push(3); }
+                } else if (curr.terminalIndex === 3) {
+                    if (rON) reachableLocalTerminals.push(7);
+                }
             }
             else if (currentDevice.type === 'contactor') {
                 if (loop === 0 && (curr.terminalIndex === 0 || curr.terminalIndex === 1)) totalResistance += 500;
@@ -150,17 +164,17 @@ function runSequenceSimulation() {
             let isPoweredThisLoop = false;
             
             if (d.type === 'relay') {
-                if (d.terminals[12]?.isLive && d.terminals[13]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (d.type === 'contactor') {
-                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (d.type === 'contact_block') {
-                if (d.extraConfig?.isEMO && d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
-                else if (d.isLampElement && d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.extraConfig?.isEMO && d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                else if (d.isLampElement && d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
-                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             
             d.isPowered = isPoweredThisLoop;
