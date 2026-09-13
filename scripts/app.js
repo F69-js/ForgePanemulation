@@ -30,6 +30,13 @@ try {
         simWires.forEach(sw => { if (context.wires[sw.index]) { context.wires[sw.index].color = sw.isLive ? '#ff4757' : '#e74c3c'; } });
         draw();
     };
+    // app.js 内の simWorker.onmessage = function(e) { ... } の末尾付近に以下を追加
+const { devices: simDevices, wires: simWires, totalAmp } = e.data; // ← totalAmp を受け取るように変更
+
+// 画面の「機器詳細設定（右メニュー枠）」やタイトルバー等にアンペアをリアルタイムデジタル表示！
+const menuHeader = document.querySelector('#right-menu h3');
+if (menuHeader) menuHeader.innerText = `機器詳細設定 (SYSTEM: ${totalAmp.toFixed(3)} A)`;
+
 } catch (err) { console.error("Worker起動エラー:", err); }
 
 function pushToEngine(type = 'UPDATE') { if (!simWorker) return; simWorker.postMessage({ type: type, data: { devices: context.devices, wires: context.wires } }); }
