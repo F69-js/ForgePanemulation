@@ -38,7 +38,8 @@ document.getElementById('add-ext-device-btn')?.addEventListener('click', () => {
     showAddDeviceMenu(selectType, (config) => {
         const newDevice = new ControlDevice(Date.now(), selectType, 100, 150, config);
         if (config.color) newDevice.color = config.color; if (config.label) newDevice.label = config.label;
-        if (config.unit) newDevice.unit = config.unit; if (config.timeUnit) { newDevice.timeUnit = config.timeUnit; newDevice.timerMode = config.timerMode; }
+        if (config.unit) newDevice.unit = config.unit; if (config.positions) newDevice.positions = config.positions;
+        if (config.timeUnit) { newDevice.timeUnit = config.timeUnit; newDevice.timerMode = config.timerMode; }
         devices.push(newDevice); draw();
     });
 });
@@ -77,60 +78,56 @@ function handleMouseDown(e) {
     const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
     
     if (currentMode === "interior") {
-        // A. 現在配線中でない場合
         if (!activeWiring) {
-            // ① 通常のネジ端子クリック判定
             for (let i = devices.length - 1; i >= 0; i--) {
                 if (devices[i].layer !== "interior") continue;
                 const tIndex = devices[i].checkTerminalClick(mx, my);
-                if (tIndex !== null) {
-                    activeWiring = { fromNode: devices[i], fromTerminal: tIndex, currentX: mx, currentY: my, points: [] };
-                    draw(); return;
-                }
+                if (tIndex !== null) { activeWiring = { fromNode: devices[i], fromTerminal: tIndex, currentX: mx, currentY: my, points: [] }; draw(); return; }
             }
-            
-            // ②【新機能】配置済みの全配線の中点（折れ曲がり角）クリック判定
             for (let w of wires) {
                 if (w.points) {
                     for (let pt of w.points) {
-                        if (Math.hypot(mx - pt.x, my - pt.y) < 8) {
-                            // 中点クリック成功！相方の端子（fromNode）をダミーとして配線を開始
-                            activeWiring = { fromNode: w.fromNode, fromTerminal: w.fromTerminal, currentX: mx, currentY: my, points: [{ x: pt.x, y: pt.y }] };
-                            draw(); return;
-                        }
+                        if (Math.hypot(mx - pt.x, my - pt.y) < 8) { activeWiring = { fromNode: w.fromNode, fromTerminal: w.fromTerminal, currentX: mx, currentY: my, points: [{ x: pt.x, y: pt.y }] }; draw(); return; }
                     }
                 }
             }
-        } 
-        // B. すでに配線中の場合
-        else {
+        } else {
             let hitTD = null, hitTI = null;
             for (let i = devices.length - 1; i >= 0; i--) {
                 if (devices[i].layer !== "interior") continue;
                 const tIndex = devices[i].checkTerminalClick(mx, my);
                 if (tIndex !== null) { hitTD = devices[i]; hitTI = tIndex; break; }
             }
-            
             if (hitTD !== null) {
                 if (hitTD !== activeWiring.fromNode) {
-                    wires.push({ fromNode: activeWiring.fromNode, fromTerminal: activeWiring.fromTerminal, toNode: hitTD, toTerminal: hitTI, points: [...activeWiring.points], color: '#e74c3c' });
-                    activeWiring = null; draw();
+                    wires.push({ fromNode: activeWiring.fromNode, fromTerminal: activeWiring.fromTerminal, toNode: hitTD, toTerminal: hitTI, points: [...activeWiring.points], color: '#e74c3c' }); activeWiring = null; draw();
                 } return;
             } else { activeWiring.points.push({ x: mx, y: my }); draw(); return; }
         }
     }
     
+    // ★【大改修】表面（外観モード）のとき、または盤内で配線中でないとき
     if (!activeWiring) {
         let hitDevice = null;
         for (let i = devices.length - 1; i >= 0; i--) {
             if (devices[i].layer !== currentMode) continue;
             if (devices[i].isMouseOver(mx, my)) {
-                hitDevice = devices[i]; draggedDevice = hitDevice; offsetX = mx - draggedDevice.x; offsetY = my - draggedDevice.y;
-                devices.splice(i, 1); devices.push(draggedDevice); break;
+                hitDevice = devices[i]; break;
             }
         }
-        if (hitDevice) { showSelectedDeviceMenu(hitDevice, (id) => { devices = devices.filter(d => d.id !== id); wires = wires.filter(w => w.fromNode.id !== id && w.toNode.id !== id); draw(); }, draw); }
-        else { clearRightMenu(); }
+        
+        if (hitDevice) {
+            // A. 外観モード（ドアが閉まっているとき）➔ 機器を移動させず、カチカチ動作させる！
+            if (currentMode === "exterior" && doorOpenProgress === 0) {
+                hitDevice.toggleAction(); // ボタン凹み・ノブ回転
+                draw();
+                return;
+            }
+            // B. 内部モード ➔ 通常通りドラッグ移動させる
+            draggedDevice = hitDevice; offsetX = mx - draggedDevice.x; offsetY = my - draggedDevice.y;
+            devices.splice(devices.indexOf(draggedDevice), 1); devices.push(draggedDevice);
+            showSelectedDeviceMenu(hitDevice, (id) => { devices = devices.filter(d => d.id !== id); wires = wires.filter(w => w.fromNode.id !== id && w.toNode.id !== id); draw(); }, draw);
+        } else { clearRightMenu(); }
         draw();
     }
 }
@@ -140,9 +137,7 @@ function handleMouseMove(e) {
     if (activeWiring) { activeWiring.currentX = mx; activeWiring.currentY = my; draw(); return; }
     if (draggedDevice) {
         let tx = mx - offsetX, ty = my - offsetY;
-        if (currentMode === "interior" && !['switch', 'analog_meter', 'digital_controller', 'panel_timer'].includes(draggedDevice.type)) {
-            ty = snapToClosestRail(draggedDevice, dinRails, ty);
-        }
+        if (currentMode === "interior" && !['switch', 'analog_meter', 'digital_controller', 'panel_timer'].includes(draggedDevice.type)) { ty = snapToClosestRail(draggedDevice, dinRails, ty); }
         draggedDevice.x = tx; draggedDevice.y = ty; syncDevicePositions(draggedDevice, devices); draw(); return;
     }
     let foundHover = null;
