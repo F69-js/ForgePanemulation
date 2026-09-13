@@ -45,6 +45,7 @@ function runSequenceSimulation() {
     }
 
     let excitedCoils = new Set();
+    let hasCompleteLoop = false;
 
     for (let loop = 0; loop < 8; loop++) {
         let visited = new Set(), queue = [];
@@ -156,19 +157,19 @@ function runSequenceSimulation() {
 
         devices.forEach(d => {
             let isPoweredThisLoop = false;
+            // ★【バグ完全根絶】大括弧 [0] と [1] をガチ付与し、見た目のネジ配列と判定を100%シンクロ！
             if (d.type === 'relay') {
-                if (d.terminals[12]?.isLive && d.terminals[13]?.isLive) { isPoweredThisLoop = true; }
+                if (d.terminals[12]?.isLive && d.terminals[13]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (d.type === 'contactor') {
-                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; }
+                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (d.type === 'contact_block') {
-                // ★【大改修の核心】ランプソケット(isLampElement)も、上下ネジ(0番と1番)の両方に電気が届いて初めてONになる閉回路ルールへ完全統一！
-                if (d.extraConfig?.isEMO && d.terminals[4]?.isLive && d.terminals[5]?.isLive) isPoweredThisLoop = true;
-                else if (d.isLampElement && d.terminals[0]?.isLive && d.terminals[1]?.isLive) isPoweredThisLoop = true;
+                if (d.extraConfig?.isEMO && d.terminals[4]?.isLive && d.terminals[5]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                else if (d.isLampElement && d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
-                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; }
+                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             d.isPowered = isPoweredThisLoop;
             if (isPoweredThisLoop) {
