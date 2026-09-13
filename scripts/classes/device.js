@@ -4,7 +4,13 @@ export class ControlDevice {
         const extTypes = ['switch', 'pilot_lamp', 'selector_sw', 'lamp_switch', 'lamp_selector', 'key_switch', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer', 'emergency_stop'];
         this.layer = extTypes.includes(type) ? 'exterior' : 'interior';
         this.linkedDeviceId = extraConfig.linkedDeviceId || null; this.hasLinkedBlock = false; 
-        if (this.layer === 'exterior') this.label = extraConfig.label || "EMO STOP";
+        if (this.layer === 'exterior') this.label = extraConfig.label || "SPARE";
+        
+        // ★【新仕様】HMIを実際に動かすための状態フラグ
+        this.isON = false; // ボタンの押し下げ状態や、ランプの点灯状態
+        this.positions = extraConfig.positions || 2; // セレクタの「何連」（2位置＝左右、3位置＝左中右）
+        this.currentPosIndex = 0; // セレクタがいま何番目の位置を指しているか (0, 1, 2)
+
         this.initSpecs();
     }
     initSpecs() {
@@ -23,14 +29,13 @@ export class ControlDevice {
         else if (this.type === 'contactor') { this.width = 75; this.height = 100; this.color = '#57606f'; this.name = 'MAGNET SW'; this.typeIndex = 11; this.terminals = [{ name: "A1 (+)" }, { name: "A2 (-)" }, { name: "1/L1 (入)" }, { name: "2/T1 (出)" }, { name: "13 (補助入)" }, { name: "14 (補助出)" }]; }
         else {
             this.width = 60; this.height = 60; this.terminals = [];
-            // ★バグ修正：マッピング配列構造を崩さない形式へ完全修復
             const specs = {
                 switch: [0, '#2ecc71', 'START'], lamp_switch: [1, '#3498db', 'RUN'], pilot_lamp: [2, '#e74c3c', 'FAULT'],
                 selector_sw: [3, '#2c3e50', 'MANU/AUTO'], lamp_selector: [4, '#2c3e50', 'MODE'], key_switch: [5, '#2c3e50', 'LOCK'],
                 buzzer: [6, '#34495e', 'ALARM'], analog_meter: [7, '#2f3542', 'CURRENT'], digital_controller: [8, '#1e252b', 'TEMP CTRL'], panel_timer: [9, '#3d464d', 'DELAY T'], emergency_stop: [12, '#d63031', 'EMO STOP']
             };
             const s = specs[this.type] || [0, '#2ecc71', 'SPARE']; 
-            this.typeIndex = s[0]; this.color = s[1]; this.name = s[2]; if(!this.extraConfig.label) this.label = s[2];
+            this.typeIndex = s[0]; this.color = s[1]; this.name = this.type.toUpperCase(); if(!this.extraConfig.label) this.label = s[2];
             if (this.type === 'analog_meter') { this.width = 80; this.height = 80; this.unit = this.extraConfig.unit || "A"; }
             else if (this.type === 'digital_controller') { this.width = 72; this.height = 72; this.unit = this.extraConfig.unit || "℃"; }
             else if (this.type === 'panel_timer') { this.width = 72; this.height = 72; this.timeUnit = this.extraConfig.timeUnit || "sec"; this.timerMode = this.extraConfig.timerMode || "ON-Delay"; }
@@ -43,7 +48,7 @@ export class ControlDevice {
         if (this.type === 'panel_timer' || this.type === 'digital_controller') return { x: this.x + 12 + ((index % 5) * 12), y: (index >= 5) ? this.y + this.height - 15 : this.y + 15 };
         if (this.type === 'contact_block' && this.extraConfig?.isEMO) return [{ x: this.x + 10, y: this.y + 10 }, { x: this.x + 10, y: this.y + 22 }, { x: this.x + 35, y: this.y + 10 }, { x: this.x + 35, y: this.y + 22 }, { x: this.x + 22, y: this.y + 42 }, { x: this.x + 22, y: this.y + 50 }][index];
         if (this.type === 'contact_block') return { x: this.x + this.width / 2, y: (index === 0) ? this.y + 10 : this.y + this.height - 10 };
-        if (this.type === 'contactor') return [{x:this.x+15,y:this.y+12},{x:this.x+15,y:this.y+this.height-12},{x:this.x+38,y:this.y+12},{x:this.x+38,y:this.y+this.height-12},{x:this.x+60,y:this.y+12},{x:this.x+60,y:this.y+this.height-12}][index];
+        if (this.type === 'contactor') return [{x:this.x+15,y:this.y+12},{x:this.x+15,y:this.y+this.height-12},{x:this.x+38,y:this.y+12},{x:this.x+38,y:this.y+this.height-12},{x:this.x+60,y:this.y+12},{x:this.x+60,y:this.y+12}][index];
         return [{ x: this.x + 15, y: this.y + 8 }, { x: this.x + this.width - 15, y: this.y + 8 }, { x: this.x + 15, y: this.y + this.height - 8 }, { x: this.x + this.width - 15, y: this.y + this.height - 8 }][index];
     }
     checkTerminalClick(mx, my) {
@@ -51,4 +56,17 @@ export class ControlDevice {
         return null;
     }
     isMouseOver(mx, my) { return mx >= this.x && mx <= this.x + this.width && my >= (this.layer === 'exterior' ? this.y - 14 : this.y) && my <= this.y + this.height; }
+    
+    // ★【新機能】クリックされたときの物理動作切り替え関数
+    toggleAction() {
+        if (['switch', 'lamp_switch', 'emergency_stop', 'key_switch'].includes(this.type)) {
+            // 自動復帰（モーメンタリ）ではなく、オルタネイト（押すごとにON/OFF反転）として動作
+            this.isON = !this.isON;
+        } else if (['selector_sw', 'lamp_selector'].includes(this.type)) {
+            // セレクタは押すごとにノッチ（連）をカチカチ切り替える
+            this.currentPosIndex = (this.currentPosIndex + 1) % this.positions;
+        } else if (this.type === 'breaker') {
+            this.isON = !this.isON;
+        }
+    }
 }
