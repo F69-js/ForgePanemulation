@@ -54,16 +54,37 @@ document.getElementById('preview-mode-btn')?.addEventListener('click', (e) => {
 document.getElementById('view-btn')?.addEventListener('click', () => { if (!context.isPreviewMode && toggleDoorMode(context.devices)) { updateButtonStates(currentMode); animateLoop(); } });
 document.getElementById('add-rail-btn')?.addEventListener('click', () => { if (currentMode !== "interior" || context.isPreviewMode) return; context.dinRails.push({ id: Date.now(), y: 80, height: dinRailHeight }); draw(); });
 
+// ★【大改修】トビラ機器を追加した「その瞬間」に、裏面ペアもIDを完全にクロス紐付けして同時生成！
 document.getElementById('add-ext-device-btn')?.addEventListener('click', () => {
     if (context.isPreviewMode) return; const selectType = document.getElementById('select-ext-type').value;
     showAddDeviceMenu(selectType, (config) => {
-        const newDevice = new ControlDevice(Date.now(), selectType, 100, 150, config);
-        if (config.color) newDevice.color = config.color; if (config.label) newDevice.label = config.label;
-        if (config.unit) newDevice.unit = config.unit; if (config.positions) newDevice.positions = config.positions;
-        if (config.timeUnit) { newDevice.timeUnit = config.timeUnit; newDevice.timerMode = config.timerMode; }
-        context.devices.push(newDevice); pushToEngine(); draw();
+        const extDevice = new ControlDevice(Date.now(), selectType, 100, 150, config);
+        if (config.color) extDevice.color = config.color; if (config.label) extDevice.label = config.label;
+        if (config.unit) extDevice.unit = config.unit; if (config.positions) extDevice.positions = config.positions;
+        if (config.timeUnit) { extDevice.timeUnit = config.timeUnit; extDevice.timerMode = config.timerMode; }
+        
+        // 裏面ブロック用の一意のIDを生成
+        const intBlockId = Date.now() + Math.random();
+        const isLamp = ['pilot_lamp', 'lamp_switch', 'lamp_selector'].includes(selectType);
+        const isEMO = (selectType === 'emergency_stop');
+        
+        // 裏面ブロックを全く同じ初期座標に生成し、お互いのIDをガッチリバインド！
+        const intBlock = new ControlDevice(intBlockId, "contact_block", 100, 150, {
+            linkedDeviceId: extDevice.id, // 裏面から表面へのリンク
+            contactType: config.contactType || "NO",
+            isLampElement: isLamp,
+            isEMO: isEMO
+        });
+        
+        extDevice.linkedDeviceId = intBlock.id; // 表面から裏面へのリンク
+        extDevice.hasLinkedBlock = true;
+        
+        // 表面パーツと裏面パーツを同時にシステム配列へ投入！
+        context.devices.push(extDevice, intBlock);
+        pushToEngine(); draw();
     });
 });
+
 document.getElementById('add-relay-btn')?.addEventListener('click', () => { if (context.isPreviewMode) return; context.devices.push(new ControlDevice(Date.now(), 'relay', 150, 100)); pushToEngine(); draw(); });
 document.getElementById('add-terminal-btn')?.addEventListener('click', () => { if (context.isPreviewMode) return; showAddDeviceMenu('terminal_block', (config) => { context.devices.push(new ControlDevice(Date.now(), 'terminal_block', 150, 100, config)); pushToEngine(); draw(); }); });
 
@@ -74,7 +95,6 @@ if (!document.getElementById('add-breaker-btn')) {
         divContainer.innerHTML = `<button class="btn" id="add-breaker-btn" style="background:linear-gradient(135deg,#2c3e50,#1a252f)">+ ブレーカー</button><button class="btn" id="add-contactor-btn" style="background:linear-gradient(135deg,#7f8c8d,#57606f)">+ 電磁接触器</button>`;
         intTools.appendChild(divContainer);
     }
-    // ★タイポ修正点：isPreviewMode を context.isPreviewMode に完全マッピングしてクラッシュを撃破！
     document.getElementById('add-breaker-btn')?.addEventListener('click', () => { if (context.isPreviewMode) return; showAddDeviceMenu('breaker', (config) => { context.devices.push(new ControlDevice(Date.now(), 'breaker', 200, 100, config)); pushToEngine(); draw(); }); });
     document.getElementById('add-contactor-btn')?.addEventListener('click', () => { if (context.isPreviewMode) return; context.devices.push(new ControlDevice(Date.now(), 'contactor', 200, 100)); pushToEngine(); draw(); });
 }
