@@ -32,16 +32,28 @@
     </div>
 
     <!-- 3. メインの制御盤パネル画面 -->
-    <div id="workspace">
-        <div id="canvas-container">
-            <canvas id="panelCanvas" width="800" height="550"></canvas>
-        </div>
-        <div class="toolbar">
-            <button class="btn" id="view-btn">🔓 中を開ける</button>
-            <button class="btn" id="add-relay-btn" style="display:none;">+ リレーを追加</button>
-            <button class="btn" id="add-switch-btn" style="display:none;">+ スイッチを追加</button>
+    <!-- index.html の変更イメージ（右側にメニューを追加） -->
+<div id="workspace" style="display: flex; gap: 20px;">
+    <div id="canvas-container">
+        <canvas id="panelCanvas" width="800" height="550"></canvas>
+    </div>
+    
+    <!-- ★右側の機器設定メニュー -->
+    <div id="right-menu" style="display: none; width: 200px; background: #2c3e50; padding: 20px; border-radius: 8px;">
+        <h3>機器設定</h3>
+        <div id="terminal-config">
+            <label>端子台の極数 (P):</label>
+            <select id="terminal-poles">
+                <option value="3">3P (電源用など)</option>
+                <option value="4" selected>4P (標準)</option>
+                <option value="6">6P (多め)</option>
+                <option value="10">10P (一括用)</option>
+            </select>
+            <button class="btn" id="confirm-add-terminal" style="margin-top: 15px; width: 100%;">端子台を配置 🛠️</button>
         </div>
     </div>
+</div>
+
 
         <!-- モジュールとしてapp.jsを読み込む -->
     <script type="module" src="scripts/app.js"></script>
