@@ -16,6 +16,7 @@ const context = {
 let simWorker = null;
 try {
     simWorker = new Worker(new URL('./engine.js', import.meta.url), { type: 'module' });
+    
     simWorker.onmessage = function(e) {
         const { devices: simDevices, wires: simWires, totalAmp } = e.data;
         context.devices.forEach(d => { d.isPowered = false; });
@@ -36,6 +37,13 @@ try {
         }
         draw();
     };
+
+    // ★【新設：天才デバッグ機能】Web Worker内でタイポや未定義エラーが出た瞬間、アラートで画面に強制通報！
+    simWorker.onerror = function(err) {
+        alert(`🚨 シミュレーションエンジン(Worker)で致命的バグ発生！\n\nエラー内容: ${err.message}\nファイル: ${err.filename.split('/').pop()}\n行数: ${err.lineno}行目`);
+        console.error("Worker Core Error:", err);
+    };
+
 } catch (err) { console.error("Worker起動エラー:", err); }
 
 function pushToEngine(type = 'UPDATE') { if (!simWorker) return; simWorker.postMessage({ type: type, data: { devices: context.devices, wires: context.wires } }); }
@@ -87,7 +95,7 @@ if (!document.getElementById('add-breaker-btn')) {
         divContainer.innerHTML = `<button class="btn" id="add-breaker-btn" style="background:linear-gradient(135deg,#2c3e50,#1a252f)">+ ブレーカー</button><button class="btn" id="add-contactor-btn" style="background:linear-gradient(135deg,#7f8c8d,#57606f)">+ 電磁接触器</button>`;
         intTools.appendChild(divContainer);
     }
-    document.getElementById('add-breaker-btn')?.addEventListener('click', () => { if (context.isPreviewMode) return; showAddDeviceMenu('breaker', (config) => { context.devices.push(new ControlDevice(Date.now(), 'breaker', 200, 100, config)); pushToEngine(); draw(); }); });
+    document.getElementById('add-breaker-btn')?.addEventListener('click', () => { if (context.isPreviewMode) return; showAddDeviceMenu('breaker', (config) => { context.devices.push(new ControlDevice(Date.now(), 'breaker', 200, 100, config)); pushToEngine(); pushToEngine(); draw(); }); });
     document.getElementById('add-contactor-btn')?.addEventListener('click', () => { if (context.isPreviewMode) return; context.devices.push(new ControlDevice(Date.now(), 'contactor', 200, 100)); pushToEngine(); draw(); });
 }
 
