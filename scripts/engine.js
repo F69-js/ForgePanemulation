@@ -168,7 +168,7 @@ function runSequenceSimulation() {
         devices.forEach(d => {
             let isPoweredThisLoop = false;
             if (d.type === 'relay') {
-                if (d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals?.isLive && d.terminals?.isLive || d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (d.type === 'contactor') {
                 if (d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
