@@ -152,18 +152,22 @@ function runSequenceSimulation() {
 
         devices.forEach(d => {
             let isPoweredThisLoop = false;
+            // ★【バグ修正の大本命】インデックスの指定漏れ（d.terminals.isLive）を完全に修復！！
             if (d.type === 'relay') {
-                if (d.terminals[11]?.isLive && d.terminals[12]?.isLive || d.terminals[12]?.isLive && d.terminals[13]?.isLive) { isPoweredThisLoop = true; }
+                if ((d.terminals[12] && d.terminals[12].isLive) || (d.terminals[13] && d.terminals[13].isLive)) { isPoweredThisLoop = true; }
             }
             else if (d.type === 'contactor') {
-                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; }
+                if ((d.terminals[0] && d.terminals[0].isLive) || (d.terminals[1] && d.terminals[1].isLive)) { isPoweredThisLoop = true; }
             }
             else if (d.type === 'contact_block') {
-                if (d.extraConfig?.isEMO && d.terminals[4]?.isLive && d.terminals[5]?.isLive) { isPoweredThisLoop = true; }
-                else if (d.isLampElement && d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; }
+                if (d.extraConfig?.isEMO) {
+                    if ((d.terminals[4] && d.terminals[4].isLive) || (d.terminals[5] && d.terminals[5].isLive)) isPoweredThisLoop = true;
+                } else if (d.isLampElement) {
+                    if ((d.terminals[0] && d.terminals[0].isLive) || (d.terminals[1] && d.terminals[1].isLive)) isPoweredThisLoop = true;
+                }
             }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
-                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; }
+                if ((d.terminals[0] && d.terminals[0].isLive) || (d.terminals[1] && d.terminals[1].isLive)) { isPoweredThisLoop = true; }
             }
             d.isPowered = isPoweredThisLoop;
             if (isPoweredThisLoop) {
