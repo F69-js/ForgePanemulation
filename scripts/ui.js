@@ -18,30 +18,44 @@ export function showAddDeviceMenu(type, onConfirm) {
         document.getElementById('btn-confirm-add').addEventListener('click', () => { onConfirm({ contactType: document.getElementById('input-contact-type').value }); clearRightMenu(); });
     }
 }
-// ★【新機能】配置したパーツをクリックしたときに銘板エディタを表示する
+// ★【新仕様】6色カラーチェンジャー機能を追加した詳細エディタ
 export function showSelectedDeviceMenu(device, onDelete, onUpdate) {
     if (!menuContent) return;
-    let labelEditor = "";
-    // トビラ表面の機器のみ銘板エディタを出現させる
+    let labelEditor = "", colorEditor = "";
+    
+    // トビラ表面の機器、または盤内の接点ブロックやリレーなどの場合
     if (device.layer === 'exterior') {
-        labelEditor = `
-            <div class="form-group">
-                <label>銘板刻印 (ラベル文字)</label>
-                <input type="text" id="edit-device-label" value="${device.label || ''}" placeholder="例: 運転">
-            </div>
-        `;
+        labelEditor = `<div class="form-group"><label>銘板刻印</label><input type="text" id="edit-device-label" value="${device.label || ''}" placeholder="例: 運転"></div>`;
+        
+        // 現場の定番6色カラーパレット (赤/緑/黄/白/青/橙)
+        const colors = [
+            { name: "赤 (FAULT / 停止)", hex: "#e74c3c" },
+            { name: "緑 (RUN / 運転)", hex: "#2ecc71" },
+            { name: "黄 (WARN / 警報)", hex: "#f1c40f" },
+            { name: "白 (POWER / 電源)", hex: "#ffffff" },
+            { name: "青 (RESET / 解除)", hex: "#3498db" },
+            { name: "橙 (ALARM / 重故障)", hex: "#e67e22" }
+        ];
+        
+        let options = colors.map(c => `<option value="${c.hex}" ${device.color === c.hex ? 'selected' : ''}>${c.name}</option>`).join('');
+        colorEditor = `<div class="form-group"><label>機器カラー変更</label><select id="edit-device-color">${options}</select></div>`;
     }
+    
     menuContent.innerHTML = `
         <div style="font-size: 0.9rem; margin-bottom: 10px;"><strong>機器型式:</strong> ${device.type.toUpperCase()}</div>
-        ${labelEditor}
+        ${labelEditor} ${colorEditor}
         <button class="btn" id="btn-delete-device" style="width: 100%; background: linear-gradient(135deg, #e74c3c, #c0392b);">機器を撤去 🗑️</button>
     `;
+    
     if (device.layer === 'exterior') {
-        const input = document.getElementById('edit-device-label');
-        // 文字が入力されるたびに即座に関数を叩いて再描画させる
-        input.addEventListener('input', () => {
-            device.label = input.value.toUpperCase();
-            onUpdate(); 
+        const inputLabel = document.getElementById('edit-device-label');
+        inputLabel.addEventListener('input', () => { device.label = inputLabel.value.toUpperCase(); onUpdate(); });
+        
+        const selectColor = document.getElementById('edit-device-color');
+        selectColor.addEventListener('change', () => {
+            device.color = selectColor.value;
+            // ★裏表連動：もしランプ付きや接点ブロック等のペアがあれば、そっちの色も連動させる拡張性を持たせる
+            onUpdate();
         });
     }
     document.getElementById('btn-delete-device').addEventListener('click', () => { onDelete(device.id); clearRightMenu(); });
