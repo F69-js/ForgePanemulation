@@ -15,20 +15,19 @@
 
     <!-- 2. 銘板・初期設定メニュー -->
     <div id="menu-modal">
-        <h2>ForgePanemulation - 制御盤設計仕様</h2>
+        <h2>ForgePanemulation - 設計仕様</h2>
         <div class="form-group">
             <label>盤の名称 (銘板に刻印)</label>
             <input type="text" id="panel-name" value="MAIN CONTROL PANEL">
         </div>
         <div class="form-group">
-            <label>主回路電圧</label>
+            <label>電源系統</label>
             <select id="panel-voltage">
-                <option value="AC 200V">AC 200V (三相)</option>
-                <option value="AC 100V" selected>AC 100V (単相)</option>
-                <option value="DC 24V">DC 24V</option>
+                <option value="AC 100V" selected>単相2線 (1Φ2W)</option>
+                <option value="AC 200V">三相3線 (3Φ3W)</option>
             </select>
         </div>
-        <button class="btn" id="build-btn" style="width:100%;">この設定で盤を製造する 🛠️</button>
+        <button class="btn" id="build-btn" style="width:100%;">盤を製造する 🛠️</button>
     </div>
 
     <!-- 3. メインの制御盤パネル画面 (Canvasと右メニューの横並び) -->
@@ -38,24 +37,38 @@
                 <canvas id="panelCanvas" width="800" height="550"></canvas>
             </div>
             
-            <!-- ★ここが新設された JavaScriptから中身を可変させる右メニュー -->
+            <!-- ★右側の可変詳細設定メニュー -->
             <div id="right-menu">
                 <h3>機器詳細設定</h3>
+                <!-- JavaScriptから中身を可変させるための重要な動的コンテナ -->
                 <div id="menu-content">
                     <p style="color: #bdc3c7; font-size: 0.9rem;">パーツを選択すると、ここに詳細な設定メニューが動的に生成されます。</p>
                 </div>
             </div>
         </div>
 
-        <div class="toolbar">
+        <div class="toolbar" style="flex-wrap: wrap; max-width: 1060px; justify-content: center; gap: 8px;">
             <button class="btn" id="view-btn">🔓 中を開ける</button>
             
-            <!-- トビラ（外観）の時に出すボタン -->
-            <button class="btn" id="add-ext-switch-btn">+ トビラ用スイッチを追加</button>
+            <!-- トビラ外観用パーツグループ -->
+            <div id="ext-tools" style="display: flex; gap: 8px;">
+                <select id="select-ext-type" class="btn" style="background: #34495e; font-size: 0.9rem; padding: 8px 12px; border: none; color: white;">
+                    <option value="switch">押しボタン (SW)</option>
+                    <option value="pilot_lamp">パイロットランプ</option>
+                    <option value="selector_sw">セレクタSW</option>
+                    <option value="lamp_switch">照光SW</option>
+                    <option value="lamp_selector">照光セレクタ</option>
+                    <option value="key_switch">キースイッチ</option>
+                    <option value="buzzer">ブザー</option>
+                </select>
+                <button class="btn" id="add-ext-device-btn">+ トビラ機器を追加</button>
+            </div>
             
-            <!-- 盤内（内部）の時に出すボタン -->
-            <button class="btn" id="add-relay-btn" style="display:none;">+ リレーを追加</button>
-            <button class="btn" id="add-terminal-btn" style="display:none;">+ 可変端子台を追加</button>
+            <!-- 盤内用パーツグループ -->
+            <div id="int-tools" style="display: none; gap: 8px;">
+                <button class="btn" id="add-relay-btn">+ リレーを追加</button>
+                <button class="btn" id="add-terminal-btn">+ 可変端子台を追加</button>
+            </div>
         </div>
     </div>
 
