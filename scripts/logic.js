@@ -4,50 +4,57 @@ export let currentMode = "exterior";
 export let doorOpenProgress = 0;      
 export let isAnimating = false;
 
-// モードの切り替えトリガー（引数のdevices配列を確実に操作）
 export function toggleDoorMode(devices) {
     if (isAnimating) return false;
     isAnimating = true;
-    
-    // トビラ表面のスイッチをスキャンし、盤内に接点ブロックを自動生成する（確実な実行）
-    if (currentMode === "exterior") {
-        syncExteriorToInterior(devices);
-    }
-    
+    if (currentMode === "exterior") syncExtToInt(devices);
     currentMode = (currentMode === "exterior") ? "interior" : "exterior";
     return true;
 }
 
-// 表裏連動のコアロジック
-function syncExteriorToInterior(devices) {
+// 外から中へ：スイッチの裏に接点ブロック（およびランプソケット）を自動生成
+function syncExtToInt(devices) {
     devices.forEach(dev => {
-        if (dev.layer === "exterior" && dev.type === "switch" && !dev.hasLinkedBlock) {
+        if (dev.layer === "exterior" && !dev.hasLinkedBlock) {
             const id = Date.now() + Math.random();
-            // スイッチと全く同じX, Y座標（トビラ裏）に接点ブロックを召喚
-            const contactType = dev.extraConfig?.contactType || "NO"; 
+            const config = dev.extraConfig || {};
             
+            // 照光タイプやランプ単体の場合は、ランプソケット要素か判定
+            const isLamp = ['pilot_lamp', 'lamp_switch', 'lamp_selector'].includes(dev.type);
+            
+            // 内部用の接点ブロックを生成し、外部パーツのIDを紐付け
             const linkedBlock = new ControlDevice(id, "contact_block", dev.x, dev.y, {
-                parentSwitchId: dev.id,
-                contactType: contactType
+                linkedDeviceId: dev.id,
+                contactType: config.contactType || "NO",
+                isLampElement: isLamp
             });
             
             devices.push(linkedBlock);
-            dev.hasLinkedBlock = true; // 生成済みフラグを立てる
+            dev.linkedDeviceId = linkedBlock.id;
+            dev.hasLinkedBlock = true;
         }
     });
+}
+
+// ★【新仕様】双方向の位置完全同期ロジック (app.jsのmousemoveから毎フレーム呼ばれる)
+export function syncDevicePositions(movedDevice, devices) {
+    if (!movedDevice.linkedDeviceId) return;
+    
+    // ペアとなる相方のパーツを探し出し、XとYの座標を完全に一致させる
+    const partner = devices.find(d => d.id === movedDevice.linkedDeviceId);
+    if (partner) {
+        partner.x = movedDevice.x;
+        partner.y = movedDevice.y;
+    }
 }
 
 export function updateDoorProgress() {
     let target = (currentMode === "interior") ? 1 : 0;
     let speed = 0.05;
-    
     if (currentMode === "interior") {
-        doorOpenProgress += speed;
-        if (doorOpenProgress >= target) { doorOpenProgress = target; isAnimating = false; }
+        doorOpenProgress += speed; if (doorOpenProgress >= target) { doorOpenProgress = target; isAnimating = false; }
     } else {
-        doorOpenProgress -= speed;
-        if (doorOpenProgress <= target) { doorOpenProgress = target; isAnimating = false; }
+        doorOpenProgress -= speed; if (doorOpenProgress <= target) { doorOpenProgress = target; isAnimating = false; }
     }
-    
     return isAnimating;
 }
