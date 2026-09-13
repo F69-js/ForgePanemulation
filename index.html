@@ -7,78 +7,48 @@
     <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
-    <!-- 1. 初期スタート画面 -->
     <div id="start-screen">
         <h1>CONTROL PANEL BUILDER</h1>
         <button class="btn" id="create-btn">⚡ 新規制御盤を設計する</button>
     </div>
-
-    <!-- 2. 銘板・初期設定メニュー -->
     <div id="menu-modal">
         <h2>ForgePanemulation - 設計仕様</h2>
-        <div class="form-group">
-            <label>盤の名称 (銘板に刻印)</label>
-            <input type="text" id="panel-name" value="MAIN CONTROL PANEL">
-        </div>
+        <div class="form-group"><label>盤の名称 (銘板に刻印)</label><input type="text" id="panel-name" value="MAIN CONTROL PANEL"></div>
         <div class="form-group">
             <label>電源系統</label>
-            <select id="panel-voltage">
-                <option value="AC 100V" selected>単相2線 (1Φ2W)</option>
-                <option value="AC 200V">三相3線 (3Φ3W)</option>
-            </select>
+            <select id="panel-voltage"><option value="AC 100V" selected>単相2線 (1Φ2W)</option><option value="AC 200V">三相3線 (3Φ3W)</option></select>
         </div>
         <button class="btn" id="build-btn" style="width:100%;">盤を製造する 🛠️</button>
     </div>
-
-    <!-- 3. メインの制御盤パネル画面 -->
     <div id="workspace">
         <div id="workspace-container">
-            <div id="canvas-container">
-                <canvas id="panelCanvas" width="800" height="550"></canvas>
-            </div>
-            
+            <div id="canvas-container"><canvas id="panelCanvas" width="800" height="550"></canvas></div>
             <div id="right-menu">
                 <h3>機器詳細設定</h3>
-                <div id="menu-content">
-                    <p style="color: #bdc3c7; font-size: 0.9rem;">パーツを選択すると詳細メニューが出現します。</p>
-                </div>
+                <div id="menu-content"><p style="color: #bdc3c7; font-size: 0.9rem;">パーツを選択すると詳細メニューが出現します。</p></div>
             </div>
         </div>
-
         <div class="toolbar" style="flex-wrap: wrap; max-width: 1060px; justify-content: center; gap: 8px;">
+            <!-- ★新設：プレビューモード切り替えボタン -->
+            <button class="btn" id="preview-mode-btn" style="background: linear-gradient(135deg, #2ecc71, #27ae60);">▶️ プレビュー開始</button>
             <button class="btn" id="view-btn">🔓 中を開ける</button>
-            
-            <!-- ★【完全復活】全てのトビラ用プロ計器・HMI機器をドロップダウンに網羅！ -->
             <div id="ext-tools" style="display: flex; gap: 8px;">
                 <select id="select-ext-type" class="btn" style="background: #34495e; font-size: 0.9rem; padding: 8px 12px; border: none; color: white;">
                     <optgroup label="■ 操作・警報スイッチ" style="background: #2c3e50;">
-                        <option value="switch" selected>押しボタン (SW)</option>
-                        <option value="lamp_switch">照光押しボタン (SW)</option>
-                        <option value="selector_sw">セレクタスイッチ</option>
-                        <option value="lamp_selector">照光セレクタスイッチ</option>
-                        <option value="key_switch">キースイッチ (点検用)</option>
-                        <option value="buzzer">警報ブザー</option>
-                        <option value="emergency_stop">非常停止ボタン (EMO)</option>
+                        <option value="switch" selected>押しボタン (SW)</option><option value="lamp_switch">照光押しボタン (SW)</option><option value="selector_sw">セレクタスイッチ</option><option value="lamp_selector">照光セレクタスイッチ</option><option value="key_switch">キースイッチ (点検用)</option><option value="buzzer">警報ブザー</option><option value="emergency_stop">非常停止ボタン (EMO)</option>
                     </optgroup>
                     <optgroup label="■ 計器・タイマー（プラント仕様）" style="background: #2c3e50;">
-                        <option value="pilot_lamp">パイロットランプ (表示灯)</option>
-                        <option value="analog_meter">アナログメーター (電流/電圧/電力など)</option>
-                        <option value="digital_controller">指示調節計 (温調/計装用マルチ)</option>
-                        <option value="panel_timer">コントロールタイマー (ONデレイ等)</option>
+                        <option value="pilot_lamp">パイロットランプ (表示灯)</option><option value="analog_meter">アナログメーター (電流/電圧/電力など)</option><option value="digital_controller">指示調節計 (温調/計装用マルチ)</option><option value="panel_timer">コントロールタイマー (ONデレイ等)</option>
                     </optgroup>
                 </select>
                 <button class="btn" id="add-ext-device-btn">+ トビラ機器を追加</button>
             </div>
-            
-            <!-- 盤内用パーツグループ（※ app.js からブレーカーとマグネットが自動追加されます） -->
             <div id="int-tools" style="display: none; gap: 8px;">
                 <button class="btn" id="add-rail-btn" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">➕ DINレールを追加</button>
-                <button class="btn" id="add-relay-btn">+ リレーを追加</button>
-                <button class="btn" id="add-terminal-btn">+ 可変端子台を追加</button>
+                <button class="btn" id="add-relay-btn">+ リレーを追加</button><button class="btn" id="add-terminal-btn">+ 可変端子台を追加</button>
             </div>
         </div>
     </div>
-
     <script type="module" src="scripts/app.js"></script>
 </body>
 </html>
