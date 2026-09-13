@@ -36,6 +36,7 @@
             <div id="canvas-container">
                 <canvas id="panelCanvas" width="800" height="550"></canvas>
             </div>
+            
             <div id="right-menu">
                 <h3>機器詳細設定</h3>
                 <div id="menu-content">
@@ -47,21 +48,28 @@
         <div class="toolbar" style="flex-wrap: wrap; max-width: 1060px; justify-content: center; gap: 8px;">
             <button class="btn" id="view-btn">🔓 中を開ける</button>
             
-            <!-- トビラ外観用パーツグループ -->
+            <!-- ★【完全復活】全てのトビラ用プロ計器・HMI機器をドロップダウンに網羅！ -->
             <div id="ext-tools" style="display: flex; gap: 8px;">
                 <select id="select-ext-type" class="btn" style="background: #34495e; font-size: 0.9rem; padding: 8px 12px; border: none; color: white;">
-                    <option value="switch">押しボタン (SW)</option>
-                    <option value="pilot_lamp">パイロットランプ</option>
-                    <option value="selector_sw">セレクタSW</option>
-                    <option value="lamp_switch">照光SW</option>
-                    <option value="lamp_selector">照光セレクタ</option>
-                    <option value="key_switch">キースイッチ</option>
-                    <option value="buzzer">ブザー</option>
+                    <optgroup label="■ 操作・警報スイッチ" style="background: #2c3e50;">
+                        <option value="switch" selected>押しボタン (SW)</option>
+                        <option value="lamp_switch">照光押しボタン (SW)</option>
+                        <option value="selector_sw">セレクタスイッチ</option>
+                        <option value="lamp_selector">照光セレクタスイッチ</option>
+                        <option value="key_switch">キースイッチ (点検用)</option>
+                        <option value="buzzer">警報ブザー</option>
+                    </optgroup>
+                    <optgroup label="■ 計器・タイマー（プラント仕様）" style="background: #2c3e50;">
+                        <option value="pilot_lamp">パイロットランプ (表示灯)</option>
+                        <option value="analog_meter">アナログメーター (電流/電圧/電力など)</option>
+                        <option value="digital_controller">指示調節計 (温調/計装用マルチ)</option>
+                        <option value="panel_timer">コントロールタイマー (ONデレイ等)</option>
+                    </optgroup>
                 </select>
                 <button class="btn" id="add-ext-device-btn">+ トビラ機器を追加</button>
             </div>
             
-            <!-- 盤内用パーツグループ (★レール追加ボタンを新設) -->
+            <!-- 盤内用パーツグループ（※ app.js からブレーカーとマグネットが自動追加されます） -->
             <div id="int-tools" style="display: none; gap: 8px;">
                 <button class="btn" id="add-rail-btn" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">➕ DINレールを追加</button>
                 <button class="btn" id="add-relay-btn">+ リレーを追加</button>
