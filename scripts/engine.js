@@ -78,7 +78,11 @@ function runSequenceSimulation() {
                 if (currentDevice.extraConfig?.isEMO) {
                     if (curr.terminalIndex === 0 || curr.terminalIndex === 1) { if(isPressed) reachableLocalTerminals.push(curr.terminalIndex === 0 ? 1 : 0); }
                     else if (curr.terminalIndex === 2 || curr.terminalIndex === 3) { if(!isPressed) reachableLocalTerminals.push(curr.terminalIndex === 2 ? 3 : 2); }
-                } else if (!currentDevice.isLampElement) {
+                    else if (curr.terminalIndex === 4 || curr.terminalIndex === 5) { reachableLocalTerminals.push(curr.terminalIndex === 4 ? 5 : 4); }
+                } else if (currentDevice.isLampElement) {
+                    let pair = curr.terminalIndex % 2 === 0 ? curr.terminalIndex + 1 : curr.terminalIndex - 1;
+                    reachableLocalTerminals.push(pair);
+                } else {
                     let canPass = (currentDevice.contactType === "NO" && isPressed) || (currentDevice.contactType === "NC" && !isPressed);
                     if (canPass) reachableLocalTerminals.push(curr.terminalIndex === 0 ? 1 : 0);
                 }
@@ -152,22 +156,19 @@ function runSequenceSimulation() {
 
         devices.forEach(d => {
             let isPoweredThisLoop = false;
-            // ★【バグ修正の大本命】インデックスの指定漏れ（d.terminals.isLive）を完全に修復！！
             if (d.type === 'relay') {
-                if ((d.terminals[12] && d.terminals[12].isLive) || (d.terminals[13] && d.terminals[13].isLive)) { isPoweredThisLoop = true; }
+                if (d.terminals[12]?.isLive && d.terminals[13]?.isLive) { isPoweredThisLoop = true; }
             }
             else if (d.type === 'contactor') {
-                if ((d.terminals[0] && d.terminals[0].isLive) || (d.terminals[1] && d.terminals[1].isLive)) { isPoweredThisLoop = true; }
+                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; }
             }
             else if (d.type === 'contact_block') {
-                if (d.extraConfig?.isEMO) {
-                    if ((d.terminals[4] && d.terminals[4].isLive) || (d.terminals[5] && d.terminals[5].isLive)) isPoweredThisLoop = true;
-                } else if (d.isLampElement) {
-                    if ((d.terminals[0] && d.terminals[0].isLive) || (d.terminals[1] && d.terminals[1].isLive)) isPoweredThisLoop = true;
-                }
+                // ★【大改修の核心】ランプソケット(isLampElement)も、上下ネジ(0番と1番)の両方に電気が届いて初めてONになる閉回路ルールへ完全統一！
+                if (d.extraConfig?.isEMO && d.terminals[4]?.isLive && d.terminals[5]?.isLive) isPoweredThisLoop = true;
+                else if (d.isLampElement && d.terminals[0]?.isLive && d.terminals[1]?.isLive) isPoweredThisLoop = true;
             }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
-                if ((d.terminals[0] && d.terminals[0].isLive) || (d.terminals[1] && d.terminals[1].isLive)) { isPoweredThisLoop = true; }
+                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; }
             }
             d.isPowered = isPoweredThisLoop;
             if (isPoweredThisLoop) {
