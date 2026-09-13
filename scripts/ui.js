@@ -11,10 +11,11 @@ export function updateButtonStates(currentMode) {
     
     const isInterior = (currentMode === "interior");
     
-    // エラー防止用の安全な表示切り替えガード
+    // エラー防止用の安全な表示切り替え（HTMLのIDグループと完全連動）
     if (extTools) extTools.style.display = isInterior ? "none" : "flex";
     if (intTools) intTools.style.display = isInterior ? "flex" : "none";
     
+    // 確実に右メニューをリセット
     clearRightMenu();
 }
 
