@@ -109,4 +109,4 @@ function handleMouseMove(e) {
     if (JSON.stringify(hoveredTerminal) !== JSON.stringify(foundHover)) { hoveredTerminal = foundHover; draw(); }
 }
 
-function handleMouseUp() { if (isPreviewMode && activePressedDevice) { activePressedDevice.isON = false; activePre
+function handleMouseUp() { if (isPreviewMode && activePressedDevice) { activePressedDevice.isON = false; activePressedDevice = null; } draggedDevice = null; draggedRail = null; draw(); }
