@@ -72,6 +72,7 @@ function runSequenceSimulation() {
             if (currentDevice.type === 'terminal_block' || (currentDevice.type === 'breaker' && currentDevice.isON)) {
                 let pair = curr.terminalIndex % 2 === 0 ? curr.terminalIndex + 1 : curr.terminalIndex - 1;
                 reachableLocalTerminals.push(pair);
+                if (loop === 0) loadCount++;
             } 
             else if (currentDevice.type === 'contact_block') {
                 let parentButton = devices.find(d => d.id === currentDevice.linkedDeviceId);
@@ -88,6 +89,7 @@ function runSequenceSimulation() {
                 } else {
                     let canPass = (currentDevice.contactType === "NO" && isPressed) || (currentDevice.contactType === "NC" && !isPressed);
                     if (canPass) reachableLocalTerminals.push(curr.terminalIndex === 0 ? 1 : 0);
+                    if (canPass && loop === 0) loadCount++;
                 }
             }
             else if (currentDevice.type === 'relay') {
@@ -166,17 +168,17 @@ function runSequenceSimulation() {
         devices.forEach(d => {
             let isPoweredThisLoop = false;
             if (d.type === 'relay') {
-                if (d.terminals[12]?.isLive && d.terminals[13]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (d.type === 'contactor') {
-                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (d.type === 'contact_block') {
-                if (d.extraConfig?.isEMO && d.terminals[4]?.isLive && d.terminals[5]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
-                else if (d.isLampElement && d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.extraConfig?.isEMO && d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                else if (d.isLampElement && d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
-                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             d.isPowered = isPoweredThisLoop;
             if (isPoweredThisLoop) {
