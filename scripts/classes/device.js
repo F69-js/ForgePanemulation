@@ -9,14 +9,18 @@ export class ControlDevice {
         this.initSpecs();
     }
     initSpecs() {
+        // ★【本物を完全に見た】DYF14Aソケットの「上3 / 中4 / 中4 / 下3」の14端子ピンアサイン
         if (this.type === 'relay') { 
-            this.width = 55; this.height = 100; this.color = '#e67e22'; this.name = 'MY4N-CR'; 
+            this.width = 55; this.height = 115; this.color = '#1e252b'; this.name = 'DYF14A SOCKET'; 
             this.terminals = [
-                {name:"13 (-)"},{name:"14 (+)"},
-                {name:"9 (1-COM)"},{name:"1 (1-NC)"},{name:"5 (1-NO)"},
-                {name:"10 (2-COM)"},{name:"2 (2-NC)"},{name:"6 (2-NO)"},
-                {name:"11 (3-COM)"},{name:"3 (3-NC)"},{name:"7 (3-NO)"},
-                {name:"12 (4-COM)"},{name:"4 (4-NC)"},{name:"8 (4-NO)"}
+                // 4段目（一番上の段 - 3極）
+                {name:"5 (1-NO)"},{name:"6 (2-NO)"},{name:"7 (3-NO)"},
+                // 3段目（上から二段目 - 4極）
+                {name:"8 (4-NO)"},{name:"1 (1-NC)"},{name:"2 (2-NC)"},{name:"3 (3-NC)"},
+                // 2段目（下から二段目 - 4極）
+                {name:"4 (4-NC)"},{name:"9 (1-COM)"},{name:"10 (2-COM)"},{name:"11 (3-COM)"},
+                // 1段目（一番下の段 - 3極）
+                {name:"12 (4-COM)"},{name:"13 (-)"},{name:"14 (+)"}
             ]; 
         } 
         else if (this.type === 'terminal_block') {
@@ -33,15 +37,11 @@ export class ControlDevice {
             this.poles = this.extraConfig.poles || 3; this.width = this.poles * 35; this.height = 105; this.color = '#ecf0f1'; this.name = `NV${this.poles}0-KC`; this.typeIndex = 10; this.terminals = []; 
             for (let i = 0; i < this.poles; i++) { this.terminals.push({ name: `LINE 電源側-${i+1}` }, { name: `LOAD 負荷側-${i+1}` }); } 
         }
-        // ★実機（SC-5-1）に完全準拠した端子配列に並び替え
         else if (this.type === 'contactor') { 
             this.width = 85; this.height = 115; this.color = '#57606f'; this.name = 'SC-5-1 MAGNET'; this.typeIndex = 11; 
             this.terminals = [
-                // 一番上の段 (2極)
                 {name:"A1 (操作コイル)"},{name:"A2 (操作コイル)"},
-                // 上5極の段
                 {name:"13NO (補助入)"},{name:"1/L1 (主入)"},{name:"3/L2 (主入)"},{name:"5/L3 (主入)"},{name:"21NC (補助入)"},
-                // 下5極の段
                 {name:"14NO (補助出)"},{name:"2/T1 (主出)"},{name:"4/T2 (主出)"},{name:"6/T3 (主出)"},{name:"22NC (補助出)"}
             ]; 
         }
@@ -59,7 +59,7 @@ export class ControlDevice {
         }
     }
     
-    // ★【実機完全準拠】[一番上2] [上5] [下5] を3層グリッドで絶対座標計算
+    // ★【大改修】DYF14Aソケットの「上3 / 中4 / 中4 / 下3」層の完璧な座標計算
     getTerminalCoords(index) {
         if (this.type === 'terminal_block') return { x: this.x + 25 + (Math.floor(index / 2) * 30), y: (index % 2 === 1) ? this.y + this.height - 15 : this.y + 15 };
         if (this.type === 'breaker') return { x: this.x + 17 + (Math.floor(index / 2) * 35), y: (index % 2 === 1) ? this.y + this.height - 12 : this.y + 12 };
@@ -68,30 +68,26 @@ export class ControlDevice {
         if (this.type === 'contact_block' && this.extraConfig?.isEMO) return [{ x: this.x + 10, y: this.y + 10 }, { x: this.x + 10, y: this.y + 22 }, { x: this.x + 35, y: this.y + 10 }, { x: this.x + 35, y: this.y + 22 }, { x: this.x + 22, y: this.y + 42 }, { x: this.x + 22, y: this.y + 50 }][index];
         if (this.type === 'contact_block') return { x: this.x + this.width / 2, y: (index === 0) ? this.y + 10 : this.y + this.height - 10 };
         
+        // ★【完全準拠】[上3] [中4] [中4] [下3] の4階建てマッピング
         if (this.type === 'relay') {
-            if (index === 0) return { x: this.x + 16, y: this.y + this.height - 15 };
-            if (index === 1) return { x: this.x + 39, y: this.y + this.height - 15 };
-            const socketIdx = index - 2;
-            return { x: this.x + 10 + ((socketIdx % 4) * 11.5), y: this.y + 15 + (Math.floor(socketIdx / 4) * 18) };
+            // 4段目（一番上の段 - 3極） -> 左右を少し空けて中央に3個並ぶ
+            if (index >= 0 && index <= 2) return { x: this.x + 16 + (index * 11.5), y: this.y + 14 };
+            
+            // 3段目（上から二段目 - 4極） -> 4個均等にギチギチ並ぶ
+            if (index >= 3 && index <= 6) return { x: this.x + 10 + ((index - 3) * 11.5), y: this.y + 32 };
+            
+            // 2段目（下から二段目 - 4極） -> 4個均等にギチギチ並ぶ
+            if (index >= 7 && index <= 10) return { x: this.x + 10 + ((index - 7) * 11.5), y: this.y + 50 };
+            
+            // 1段目（一番下の段 - 3極） -> コイル極含む、左右を少し空けて中央に3個並ぶ
+            if (index >= 11 && index <= 13) return { x: this.x + 16 + ((index - 11) * 11.5), y: this.y + this.height - 14 };
         }
         
-        // ★新仕様：電磁接触器（SC-5-1）の 2 + 5 + 5 の立体三層マッピング
+        // 富士電機SC-5-1型 3層マッピング [一番上2] [上5] [下5]
         if (this.type === 'contactor') {
-            // 一番上の段 (インデックス0, 1: 操作コイル A1, A2) -> 中央寄りに2本並ぶ
-            if (index === 0) return { x: this.x + 29, y: this.y + 12 };
-            if (index === 1) return { x: this.x + 56, y: this.y + 12 };
-            
-            // 上5極の段 (インデックス2〜6) -> 13NO, 1, 3, 5, 21NC
-            if (index >= 2 && index <= 6) {
-                const col = index - 2; // 0〜4
-                return { x: this.x + 12 + (col * 15.2), y: this.y + 25 };
-            }
-            
-            // 下5極の段 (インデックス7〜11) -> 14NO, 2, 4, 6, 22NC
-            if (index >= 7 && index <= 11) {
-                const col = index - 7; // 0〜4
-                return { x: this.x + 12 + (col * 15.2), y: this.y + this.height - 12 };
-            }
+            if (index === 0) return { x: this.x + 29, y: this.y + 12 }; if (index === 1) return { x: this.x + 56, y: this.y + 12 };
+            if (index >= 2 && index <= 6) return { x: this.x + 12 + ((index - 2) * 15.2), y: this.y + 25 };
+            if (index >= 7 && index <= 11) return { x: this.x + 12 + ((index - 7) * 15.2), y: this.y + this.height - 12 };
         }
         return [{ x: this.x + 15, y: this.y + 8 }, { x: this.x + this.width - 15, y: this.y + 8 }, { x: this.x + 15, y: this.y + this.height - 8 }, { x: this.x + this.width - 15, y: this.y + this.height - 8 }][index];
     }
