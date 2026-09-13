@@ -44,9 +44,7 @@ function runSequenceSimulation() {
         return;
     }
 
-    let hasCompleteLoop = false;
     let excitedCoils = new Set();
-    let loadCount = 0;
 
     for (let loop = 0; loop < 8; loop++) {
         let visited = new Set(), queue = [];
@@ -72,7 +70,6 @@ function runSequenceSimulation() {
             if (currentDevice.type === 'terminal_block' || (currentDevice.type === 'breaker' && currentDevice.isON)) {
                 let pair = curr.terminalIndex % 2 === 0 ? curr.terminalIndex + 1 : curr.terminalIndex - 1;
                 reachableLocalTerminals.push(pair);
-                if (loop === 0) loadCount++;
             } 
             else if (currentDevice.type === 'contact_block') {
                 let parentButton = devices.find(d => d.id === currentDevice.linkedDeviceId);
@@ -81,20 +78,12 @@ function runSequenceSimulation() {
                 if (currentDevice.extraConfig?.isEMO) {
                     if (curr.terminalIndex === 0 || curr.terminalIndex === 1) { if(isPressed) reachableLocalTerminals.push(curr.terminalIndex === 0 ? 1 : 0); }
                     else if (curr.terminalIndex === 2 || curr.terminalIndex === 3) { if(!isPressed) reachableLocalTerminals.push(curr.terminalIndex === 2 ? 3 : 2); }
-                    else if (curr.terminalIndex === 4 || curr.terminalIndex === 5) {
-                        if (loop === 0) loadCount++;
-                    }
-                } else if (currentDevice.isLampElement) {
-                    if (loop === 0) loadCount++;
-                } else {
+                } else if (!currentDevice.isLampElement) {
                     let canPass = (currentDevice.contactType === "NO" && isPressed) || (currentDevice.contactType === "NC" && !isPressed);
                     if (canPass) reachableLocalTerminals.push(curr.terminalIndex === 0 ? 1 : 0);
-                    if (canPass && loop === 0) loadCount++;
                 }
             }
             else if (currentDevice.type === 'relay') {
-                if (loop === 0 && (curr.terminalIndex === 12 || curr.terminalIndex === 13)) loadCount++;
-                
                 let rON = excitedCoils.has(currentDevice.id);
                 
                 if (curr.terminalIndex === 8) {
@@ -132,7 +121,6 @@ function runSequenceSimulation() {
                 }
             }
             else if (currentDevice.type === 'contactor') {
-                if (loop === 0 && (curr.terminalIndex === 0 || curr.terminalIndex === 1)) loadCount++;
                 let mON = excitedCoils.has(currentDevice.id);
                 if (mON) {
                     if (curr.terminalIndex === 3) reachableLocalTerminals.push(8); if (curr.terminalIndex === 8) reachableLocalTerminals.push(3);
@@ -145,9 +133,6 @@ function runSequenceSimulation() {
                 if (curr.terminalIndex === 0 || curr.terminalIndex === 1) {
                     reachableLocalTerminals.push(curr.terminalIndex);
                 }
-            }
-            else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(currentDevice.type)) {
-                if (loop === 0) loadCount++;
             }
 
             reachableLocalTerminals.forEach(tIdx => {
@@ -168,17 +153,17 @@ function runSequenceSimulation() {
         devices.forEach(d => {
             let isPoweredThisLoop = false;
             if (d.type === 'relay') {
-                if (d.terminals?.isLive && d.terminals?.isLive || d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals[11]?.isLive && d.terminals[12]?.isLive || d.terminals[12]?.isLive && d.terminals[13]?.isLive) { isPoweredThisLoop = true; }
             }
             else if (d.type === 'contactor') {
-                if (d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; }
             }
             else if (d.type === 'contact_block') {
-                if (d.extraConfig?.isEMO && d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
-                else if (d.isLampElement && d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.extraConfig?.isEMO && d.terminals[4]?.isLive && d.terminals[5]?.isLive) { isPoweredThisLoop = true; }
+                else if (d.isLampElement && d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; }
             }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
-                if (d.terminals?.isLive && d.terminals?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; }
             }
             d.isPowered = isPoweredThisLoop;
             if (isPoweredThisLoop) {
@@ -187,7 +172,11 @@ function runSequenceSimulation() {
         });
     }
 
-    const finalAmp = hasCompleteLoop ? (0.062 * Math.max(loadCount, 1)) : 0;
+    let finalActiveLoads = 0;
+    devices.forEach(d => {
+        if (d.isPowered && d.type !== 'contact_block') finalActiveLoads++;
+    });
+    const finalAmp = 0.062 * finalActiveLoads;
 
     self.postMessage({
         devices: devices.map(d => ({ id: d.id, isON: d.isON, currentPosIndex: d.currentPosIndex, isPowered: d.isPowered })),
