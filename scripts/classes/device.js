@@ -20,7 +20,12 @@ export class ControlDevice {
         } 
         else if (this.type === 'terminal_block') {
             this.poles = this.extraConfig.poles || 4; this.width = this.poles * 30 + 20; this.height = 75; this.color = '#242b30'; this.name = `${this.poles}P 端子台`; this.terminals = [];
-            for (let i = 0; i < this.poles; i++) { let p = this.extraConfig.isMainPower ? (["R", "S", "T", "N"][i] || `${i + 1}`) : `${i + 1}`; this.terminals.push({ name: `極-${p} [上]` }, { name: `極-${p} [下]` }); }
+            // ★【バグ修正】インデックスが綺麗に 0(左上), 1(左下), 2(右上), 3(右下) と順番に並ぶように端子構造配列を初期化
+            for (let i = 0; i < this.poles; i++) { 
+                let p = this.extraConfig.isMainPower ? (["R", "S", "T", "N"][i] || `${i + 1}`) : `${i + 1}`; 
+                this.terminals.push({ name: `極-${p} [上]` }); 
+                this.terminals.push({ name: `極-${p} [下]` }); 
+            }
         } 
         else if (this.type === 'contact_block') {
             this.contactType = this.extraConfig.contactType || "NO"; this.isLampElement = this.extraConfig.isLampElement || false; this.width = 45; this.height = 55;
@@ -48,11 +53,7 @@ export class ControlDevice {
                 buzzer: [6, '#34495e', 'ALARM'], analog_meter: [7, '#2f3542', 'CURRENT'], digital_controller: [8, '#1e252b', 'TEMP CTRL'], panel_timer: [9, '#3d464d', 'DELAY T'], emergency_stop: [12, '#d63031', 'EMO STOP']
             };
             const s = specs[this.type] || [0, '#2ecc71', 'SPARE']; 
-            // ★【バグ修正の大本命】配列から要素を正しくインデックス抽出して、型式番号とカラーを復元！
-            this.typeIndex = s[0]; 
-            this.color = s[1]; 
-            this.name = this.type.toUpperCase(); 
-            if(!this.extraConfig.label) this.label = s[2];
+            this.typeIndex = s; this.color = s; this.name = this.type.toUpperCase(); if(!this.extraConfig.label) this.label = s;
             
             if (this.type === 'analog_meter') { this.width = 80; this.height = 80; this.unit = this.extraConfig.unit || "A"; }
             else if (this.type === 'digital_controller') { this.width = 72; this.height = 72; this.unit = this.extraConfig.unit || "℃"; }
@@ -60,8 +61,16 @@ export class ControlDevice {
         }
     }
     
+    // ★【バグ修正の大本命】見た目のクリック座標とインデックス番号（0=左上, 1=左下, 2=右上, 3=右下）を100%完全にシンクロ直結！
     getTerminalCoords(index) {
-        if (this.type === 'terminal_block') return { x: this.x + 25 + (Math.floor(index / 2) * 30), y: (index % 2 === 1) ? this.y + this.height - 15 : this.y + 15 };
+        if (this.type === 'terminal_block') {
+            const poleIdx = Math.floor(index / 2); // 何極目か (0, 1, 2...)
+            const isBottom = (index % 2 === 1);    // 奇数なら下ネジ、偶数なら上ネジ
+            return {
+                x: this.x + 25 + (poleIdx * 30),
+                y: isBottom ? this.y + this.height - 15 : this.y + 15
+            };
+        }
         if (this.type === 'breaker') return { x: this.x + 17 + (Math.floor(index / 2) * 35), y: (index % 2 === 1) ? this.y + this.height - 12 : this.y + 12 };
         if (this.type === 'analog_meter' || this.type === 'buzzer') return index === 0 ? { x: this.x + this.width / 2 - 15, y: this.y + this.height / 2 } : { x: this.x + this.width / 2 + 15, y: this.y + this.height / 2 };
         if (this.type === 'panel_timer' || this.type === 'digital_controller') return { x: this.x + 12 + ((index % 5) * 12), y: (index >= 5) ? this.y + this.height - 15 : this.y + 15 };
@@ -80,7 +89,7 @@ export class ControlDevice {
             if (index >= 2 && index <= 6) return { x: this.x + 12 + ((index - 2) * 15.2), y: this.y + 25 };
             if (index >= 7 && index <= 11) return { x: this.x + 12 + ((index - 7) * 15.2), y: this.y + this.height - 12 };
         }
-        return [{ x: this.x + 15, y: this.y + 8 }, { x: this.x + this.width - 15, y: this.y + 8 }, { x: this.x + 15, y: this.y + 8 - d.height }, { x: this.x + this.width - 15, y: this.y + 8 - d.height }][index];
+        return [{ x: this.x + 15, y: this.y + 8 }, { x: this.x + this.width - 15, y: this.y + 8 }, { x: this.x + 15, y: this.y + 8 - h }, { x: this.x + this.width - 15, y: this.y + 8 - h }][index];
     }
     checkTerminalClick(mx, my) {
         for (let i = 0; i < this.terminals.length; i++) { if (Math.hypot(mx - this.getTerminalCoords(i).x, my - this.getTerminalCoords(i).y) < 8) return i; }
