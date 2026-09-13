@@ -3,6 +3,7 @@ import { updateButtonStates, showAddDeviceMenu, showSelectedDeviceMenu, clearRig
 import { drawAll } from './draw.js';
 import { ControlDevice } from './classes/device.js';
 import { initInputHandler } from './inputHandler.js';
+import { savePanelToFile, loadPanelFromFile } from './files.js';
 
 const startScreen = document.getElementById('start-screen'), menuModal = document.getElementById('menu-modal'), workspace = document.getElementById('workspace'), canvas = document.getElementById('panelCanvas'), ctx = canvas.getContext('2d');
 const dinRailHeight = 40;
@@ -17,39 +18,25 @@ try {
     simWorker = new Worker(new URL('./engine.js', import.meta.url), { type: 'module' });
     simWorker.onmessage = function(e) {
         const { devices: simDevices, wires: simWires, totalAmp } = e.data;
-        
-        // すべてのデバイスの発光・起動ステート（isPowered）を一旦クリアして再計算
         context.devices.forEach(d => { d.isPowered = false; });
-        
         simDevices.forEach(sd => {
             const target = context.devices.find(d => d.id === sd.id);
             if (target) {
-                // 計算エンジン側で通電していればフラグを反映
-                if (sd.isPowered) {
-                    target.isPowered = true;
-                }
-                
-                // ★【大改修の核心】どんな機器やブロックであっても、裏面ペアが通電していたら、
-                // 双方向に紐付いている表側の親機器（ランプ、照光SWなど）へ確実に100%通電発光フラグを直結・伝播させる！
+                if (sd.isPowered) { target.isPowered = true; }
                 if (target.isPowered && target.linkedDeviceId) {
                     const sibling = context.devices.find(d => d.id === target.linkedDeviceId);
                     if (sibling) sibling.isPowered = true;
                 }
             }
         });
-        
         simWires.forEach(sw => { if (context.wires[sw.index]) { context.wires[sw.index].color = sw.isLive ? '#ff4757' : '#e74c3c'; } });
-        
         const menuHeader = document.querySelector('#right-menu h3');
         if (menuHeader) {
             menuHeader.innerText = `機器詳細設定 (SYSTEM: ${Number.isFinite(totalAmp) ? totalAmp.toFixed(3) : "0.000"} A)`;
         }
-        
         draw();
     };
-} catch (err) { 
-    console.error("Worker起動エラー:", err); 
-}
+} catch (err) { console.error("Worker起動エラー:", err); }
 
 function pushToEngine(type = 'UPDATE') { if (!simWorker) return; simWorker.postMessage({ type: type, data: { devices: context.devices, wires: context.wires } }); }
 
@@ -80,15 +67,12 @@ document.getElementById('add-ext-device-btn')?.addEventListener('click', () => {
         if (config.color) newDevice.color = config.color; if (config.label) newDevice.label = config.label;
         if (config.unit) newDevice.unit = config.unit; if (config.positions) newDevice.positions = config.positions;
         if (config.timeUnit) { newDevice.timeUnit = config.timeUnit; newDevice.timerMode = config.timerMode; }
-        
         const intBlockId = Date.now() + Math.random();
         const isLamp = ['pilot_lamp', 'lamp_switch', 'lamp_selector'].includes(selectType);
         const isEMO = (selectType === 'emergency_stop');
-        
         const intBlock = new ControlDevice(intBlockId, "contact_block", 100, 150, {
             linkedDeviceId: newDevice.id, contactType: config.contactType || "NO", isLampElement: isLamp, isEMO: isEMO
         });
-        
         newDevice.linkedDeviceId = intBlock.id; newDevice.hasLinkedBlock = true;
         context.devices.push(newDevice, intBlock); pushToEngine(); draw();
     });
@@ -106,6 +90,9 @@ if (!document.getElementById('add-breaker-btn')) {
     document.getElementById('add-breaker-btn')?.addEventListener('click', () => { if (context.isPreviewMode) return; showAddDeviceMenu('breaker', (config) => { context.devices.push(new ControlDevice(Date.now(), 'breaker', 200, 100, config)); pushToEngine(); draw(); }); });
     document.getElementById('add-contactor-btn')?.addEventListener('click', () => { if (context.isPreviewMode) return; context.devices.push(new ControlDevice(Date.now(), 'contactor', 200, 100)); pushToEngine(); draw(); });
 }
+
+document.getElementById('save-btn')?.addEventListener('click', () => savePanelToFile(context));
+document.getElementById('load-btn')?.addEventListener('click', () => loadPanelFromFile(context, ControlDevice, draw, pushToEngine));
 
 if (canvas) { initInputHandler(canvas, context, () => { pushToEngine(); draw(); }); }
 function animateLoop() { const continuing = updateDoorProgress(); draw(); if (continuing) requestAnimationFrame(animateLoop); }
