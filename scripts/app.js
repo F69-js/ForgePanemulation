@@ -1,9 +1,9 @@
-import { currentMode, isAnimating, toggleDoorMode, updateDoorProgress, syncDevicePositions } from './logic.js';
+// 修正：doorOpenProgress をしっかりとインポート元に追加
+import { currentMode, isAnimating, toggleDoorMode, updateDoorProgress, syncDevicePositions, doorOpenProgress } from './logic.js';
 import { updateButtonStates, showAddDeviceMenu, showSelectedDeviceMenu, clearRightMenu } from './ui.js';
 import { drawAll } from './draw.js';
 import { ControlDevice } from './classes/device.js';
 
-// HTML上の各画面要素を確実に取得
 const startScreen = document.getElementById('start-screen');
 const menuModal = document.getElementById('menu-modal');
 const workspace = document.getElementById('workspace');
@@ -23,49 +23,49 @@ const dinRailY = 240;
 const dinRailHeight = 40;
 
 window.addEventListener('DOMContentLoaded', () => {
-    // 1. スタート画面からメニューへの遷移（修正：定義エラーを解消）
-    document.getElementById('create-btn').addEventListener('click', () => {
-        startScreen.style.display = 'none';
-        menuModal.style.display = 'block';
-    });
-
-    // 2. 製造（ビルド）ボタン押下時
-    document.getElementById('build-btn').addEventListener('click', () => {
-        panelConfig.name = document.getElementById('panel-name').value.toUpperCase();
-        const voltSelect = document.getElementById('panel-voltage');
-        panelConfig.phase = (voltSelect.value === "AC 200V") ? "3Φ3W (三相3線)" : "1Φ2W (単相2線)";
-        
-        menuModal.style.display = 'none';
-        workspace.style.display = 'flex';
-
-        // 初期メイン端子台の自動生成
-        const mainPoles = (voltSelect.value === "AC 200V") ? 3 : 2;
-        const mainTerminal = new ControlDevice(Date.now(), 'terminal_block', 30, dinRailY, {
-            poles: mainPoles,
-            isMainPower: true
+    if (document.getElementById('create-btn')) {
+        document.getElementById('create-btn').addEventListener('click', () => {
+            if (startScreen) startScreen.style.display = 'none';
+            if (menuModal) menuModal.style.display = 'block';
         });
-        mainTerminal.y = (dinRailY + dinRailHeight / 2) - mainTerminal.height / 2;
-        devices.push(mainTerminal);
+    }
 
-        updateButtonStates(currentMode);
-        draw();
-    });
+    if (document.getElementById('build-btn')) {
+        document.getElementById('build-btn').addEventListener('click', () => {
+            panelConfig.name = document.getElementById('panel-name').value.toUpperCase();
+            const voltSelect = document.getElementById('panel-voltage');
+            panelConfig.phase = (voltSelect.value === "AC 200V") ? "3Φ3W (三相3線)" : "1Φ2W (単相2線)";
+            
+            if (menuModal) menuModal.style.display = 'none';
+            if (workspace) workspace.style.display = 'flex';
 
-    // 3. 開閉ボタン
-    document.getElementById('view-btn').addEventListener('click', () => {
-        if (toggleDoorMode(devices)) {
+            const mainPoles = (voltSelect.value === "AC 200V") ? 3 : 2;
+            const mainTerminal = new ControlDevice(Date.now(), 'terminal_block', 30, dinRailY, {
+                poles: mainPoles,
+                isMainPower: true
+            });
+            mainTerminal.y = (dinRailY + dinRailHeight / 2) - mainTerminal.height / 2;
+            devices.push(mainTerminal);
+
             updateButtonStates(currentMode);
-            animateLoop();
-        }
-    });
+            draw();
+        });
+    }
 
-    // 4. 【IDエラー修正】トビラ用機器の追加ボタンイベント
+    if (document.getElementById('view-btn')) {
+        document.getElementById('view-btn').addEventListener('click', () => {
+            if (toggleDoorMode(devices)) {
+                updateButtonStates(currentMode);
+                animateLoop();
+            }
+        });
+    }
+
     const addExtBtn = document.getElementById('add-ext-device-btn');
     if (addExtBtn) {
         addExtBtn.addEventListener('click', () => {
             const selectType = document.getElementById('select-ext-type').value;
             
-            // 裏側への接点設定が必要なタイプかを判定
             if (['switch', 'lamp_switch'].includes(selectType)) {
                 showAddDeviceMenu('ext_switch', (config) => {
                     const newDevice = new ControlDevice(Date.now(), selectType, 100, 150, config);
@@ -80,24 +80,29 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 5. 内部パーツ追加ボタン
-    document.getElementById('add-relay-btn').addEventListener('click', () => {
-        const newDevice = new ControlDevice(Date.now(), 'relay', 150, 100);
-        devices.push(newDevice);
-        draw();
-    });
-
-    document.getElementById('add-terminal-btn').addEventListener('click', () => {
-        showAddDeviceMenu('terminal_block', (config) => {
-            const newDevice = new ControlDevice(Date.now(), 'terminal_block', 150, 100, config);
+    if (document.getElementById('add-relay-btn')) {
+        document.getElementById('add-relay-btn').addEventListener('click', () => {
+            const newDevice = new ControlDevice(Date.now(), 'relay', 150, 100);
             devices.push(newDevice);
             draw();
         });
-    });
+    }
 
-    canvas.addEventListener('mousedown', handleMouseDown);
-    canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('mouseup', handleMouseUp);
+    if (document.getElementById('add-terminal-btn')) {
+        document.getElementById('add-terminal-btn').addEventListener('click', () => {
+            showAddDeviceMenu('terminal_block', (config) => {
+                const newDevice = new ControlDevice(Date.now(), 'terminal_block', 150, 100, config);
+                devices.push(newDevice);
+                draw();
+            });
+        });
+    }
+
+    if (canvas) {
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('mouseup', handleMouseUp);
+    }
 });
 
 function animateLoop() {
@@ -106,7 +111,9 @@ function animateLoop() {
 }
 
 function draw() {
-    drawAll(ctx, canvas, panelConfig, devices, wires, activeWiring, hoveredTerminal);
+    if (ctx && canvas) {
+        drawAll(ctx, canvas, panelConfig, devices, wires, activeWiring, hoveredTerminal);
+    }
 }
 
 function handleMouseDown(e) {
@@ -156,7 +163,6 @@ function handleMouseMove(e) {
         }
         draggedDevice.x = tx; draggedDevice.y = ty;
         
-        // ドラッグ時に双方向の表裏位置をリアルタイム完全同期
         syncDevicePositions(draggedDevice, devices);
         
         draw(); return;
