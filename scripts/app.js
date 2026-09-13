@@ -16,23 +16,30 @@ let simWorker = null;
 try {
     simWorker = new Worker(new URL('./engine.js', import.meta.url), { type: 'module' });
     simWorker.onmessage = function(e) {
-        // ★【バグ修正の大本命】Workerからの電流データ (totalAmp) を安全に受け取る
         const { devices: simDevices, wires: simWires, totalAmp } = e.data;
+        
+        // すべてのデバイスの発光・起動ステート（isPowered）を一旦クリアして再計算
+        context.devices.forEach(d => { d.isPowered = false; });
         
         simDevices.forEach(sd => {
             const target = context.devices.find(d => d.id === sd.id);
             if (target) {
-                target.isPowered = sd.isPowered;
-                if (target.type === 'contact_block' && target.isPowered) {
-                    const parent = context.devices.find(d => d.id === target.linkedDeviceId);
-                    if (parent) parent.isPowered = true;
+                // 計算エンジン側で通電していればフラグを反映
+                if (sd.isPowered) {
+                    target.isPowered = true;
+                }
+                
+                // ★【大改修の核心】どんな機器やブロックであっても、裏面ペアが通電していたら、
+                // 双方向に紐付いている表側の親機器（ランプ、照光SWなど）へ確実に100%通電発光フラグを直結・伝播させる！
+                if (target.isPowered && target.linkedDeviceId) {
+                    const sibling = context.devices.find(d => d.id === target.linkedDeviceId);
+                    if (sibling) sibling.isPowered = true;
                 }
             }
         });
         
         simWires.forEach(sw => { if (context.wires[sw.index]) { context.wires[sw.index].color = sw.isLive ? '#ff4757' : '#e74c3c'; } });
         
-        // ★【完全連動】HTMLの追加を一切行わず、右メニューの h3 見出しをデジタル電流計へ動的トランスフォーム！
         const menuHeader = document.querySelector('#right-menu h3');
         if (menuHeader) {
             menuHeader.innerText = `機器詳細設定 (SYSTEM: ${Number.isFinite(totalAmp) ? totalAmp.toFixed(3) : "0.000"} A)`;
@@ -41,7 +48,6 @@ try {
         draw();
     };
 } catch (err) { 
-    // ★タイポ修正：内部変数を「err」に統一し、Worker起動前のReferenceErrorを完全根絶！
     console.error("Worker起動エラー:", err); 
 }
 
