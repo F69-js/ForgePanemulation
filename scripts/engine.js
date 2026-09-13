@@ -40,7 +40,6 @@ function isTerminalLive(deviceId, tIdx) {
 }
 
 function runSequenceSimulation() {
-    // 1. 各ネジ端子の通電マーク（isLive）のみを毎フレームクリア
     devices.forEach(d => {
         if(!d.terminals || d.terminals.length === 0) {
             d.terminals = Array.from({ length: 20 }, () => ({ isLive: false }));
@@ -49,18 +48,17 @@ function runSequenceSimulation() {
         }
     });
 
+    // ★【大改修】どんなスイッチ経由でも、一番最初に生成された（配列の先頭にある＝主電源用の）端子台を絶対電源として完全ロックオン！
     const mainPower = devices.find(d => d.type === 'terminal_block');
     if (!mainPower) return sendResults();
 
-    // 2. リレーのフィードバック走査
-    // ★【バグ修正】タイポを完全根絶！安全に8回ループが収束計算として回ります
     for (let loop = 0; loop < 8; loop++) {
         let visited = new Set(), queue = [];
         let activeCoils = new Set();
         
-        // 2P端子台の0番ネジ(R)と1番ネジ(N)をスタート地点に指定
+        // ★修正点：見た目通りのインデックス構造に直ったため、左上（0番：R相）と右上（2番：N相）を絶対スタート地点に指定！
         queue.push({ deviceId: mainPower.id, terminalIndex: 0 });
-        queue.push({ deviceId: mainPower.id, terminalIndex: 1 });
+        queue.push({ deviceId: mainPower.id, terminalIndex: 2 });
 
         while (queue.length > 0) {
             let curr = queue.shift();
@@ -98,29 +96,24 @@ function runSequenceSimulation() {
                 }
             }
             else if (currentDevice.type === 'relay') {
-                // DYF14A配列：最下段の12番、13番がコイル（実機の13, 14番）
                 if (curr.terminalIndex === 11 || curr.terminalIndex === 12 || curr.terminalIndex === 13) {
                     activeCoils.add(currentDevice.id);
                 }
                 
                 let rON = currentDevice.isPowered || activeCoils.has(currentDevice.id);
                 
-                // 1回路目: COM(8) -> NC(4) / NO(0)
                 if (curr.terminalIndex === 8) { reachableLocalTerminals.push(rON ? 0 : 4); }
                 else if (curr.terminalIndex === 4 && !rON) { reachableLocalTerminals.push(8); }
                 else if (curr.terminalIndex === 0 && rON) { reachableLocalTerminals.push(8); }
                 
-                // 2回路目: COM(9) -> NC(5) / NO(1)
                 if (curr.terminalIndex === 9) { reachableLocalTerminals.push(rON ? 1 : 5); }
                 else if (curr.terminalIndex === 5 && !rON) { reachableLocalTerminals.push(9); }
                 else if (curr.terminalIndex === 1 && rON) { reachableLocalTerminals.push(9); }
                 
-                // 3回路目: COM(10) -> NC(6) / NO(2)
                 if (curr.terminalIndex === 10) { reachableLocalTerminals.push(rON ? 2 : 6); }
                 else if (curr.terminalIndex === 6 && !rON) { reachableLocalTerminals.push(10); }
                 else if (curr.terminalIndex === 2 && rON) { reachableLocalTerminals.push(10); }
 
-                // 4回路目: COM(7) -> NC(3) / NO(3)
                 if (curr.terminalIndex === 7) { reachableLocalTerminals.push(3); }
                 else if (curr.terminalIndex === 3) { reachableLocalTerminals.push(7); }
             }
@@ -147,7 +140,6 @@ function runSequenceSimulation() {
                 queue.push({ deviceId: currentDevice.id, terminalIndex: tIdx });
             });
 
-            // 外側の直線電線を伝って隣へ走査
             wires.forEach(w => {
                 if (w.fromNode.id === currentDevice.id && w.fromTerminal === curr.terminalIndex) {
                     queue.push({ deviceId: w.toNode.id, terminalIndex: w.toTerminal });
