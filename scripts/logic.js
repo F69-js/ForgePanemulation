@@ -18,11 +18,8 @@ function syncExtToInt(devices) {
         if (dev.layer === "exterior" && !dev.hasLinkedBlock) {
             const id = Date.now() + Math.random();
             const config = dev.extraConfig || {};
-            
-            // 照光タイプやランプ単体の場合は、ランプソケット要素か判定
             const isLamp = ['pilot_lamp', 'lamp_switch', 'lamp_selector'].includes(dev.type);
             
-            // 内部用の接点ブロックを生成し、外部パーツのIDを紐付け
             const linkedBlock = new ControlDevice(id, "contact_block", dev.x, dev.y, {
                 linkedDeviceId: dev.id,
                 contactType: config.contactType || "NO",
@@ -36,16 +33,48 @@ function syncExtToInt(devices) {
     });
 }
 
-// ★【新仕様】双方向の位置完全同期ロジック (app.jsのmousemoveから毎フレーム呼ばれる)
+// 双方向の位置完全同期ロジック
 export function syncDevicePositions(movedDevice, devices) {
     if (!movedDevice.linkedDeviceId) return;
-    
-    // ペアとなる相方のパーツを探し出し、XとYの座標を完全に一致させる
     const partner = devices.find(d => d.id === movedDevice.linkedDeviceId);
     if (partner) {
         partner.x = movedDevice.x;
         partner.y = movedDevice.y;
     }
+}
+
+// ★【新仕様】多段化されたすべてのレールをスキャンして自動吸着（スナップ）させる関数
+// movedDevice: ドラッグ中の機器, dinRails: 画面内の全レール配列, targetY: 移動させようとしているY座標
+export function snapToClosestRail(movedDevice, dinRails, targetY) {
+    // スイッチ（トビラ用）はレールに吸着しない
+    if (movedDevice.type === 'switch') return targetY;
+
+    const deviceHalfH = movedDevice.height / 2;
+    const deviceCenterY = targetY + deviceHalfH;
+    const snapThreshold = 40; // 吸着を検知する距離（ピクセル）
+
+    let closestRail = null;
+    let minDistance = Infinity;
+
+    // 画面内のすべてのレールの中から、パーツの中心に一番近いレールをスキャン
+    dinRails.forEach(rail => {
+        const railCenterY = rail.y + (rail.height / 2);
+        const distance = Math.abs(deviceCenterY - railCenterY);
+        
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestRail = rail;
+        }
+    });
+
+    // 一番近いレールが有効な距離内（しきい値内）にあれば、そのレールのY座標中央に固定
+    if (closestRail && minDistance < snapThreshold) {
+        const railCenterY = closestRail.y + (closestRail.height / 2);
+        return railCenterY - deviceHalfH;
+    }
+
+    // どのレールからも遠い場合は、ドラッグしたままのY座標を返す（自由移動）
+    return targetY;
 }
 
 export function updateDoorProgress() {
