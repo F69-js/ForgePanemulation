@@ -47,7 +47,6 @@ document.getElementById('add-ext-device-btn')?.addEventListener('click', () => {
 document.getElementById('add-relay-btn')?.addEventListener('click', () => { devices.push(new ControlDevice(Date.now(), 'relay', 150, 100)); draw(); });
 document.getElementById('add-terminal-btn')?.addEventListener('click', () => { showAddDeviceMenu('terminal_block', (config) => { devices.push(new ControlDevice(Date.now(), 'terminal_block', 150, 100, config)); draw(); }); });
 
-// ★【修正バグ】insertAdjacentHTML のオーバーライド破壊を防ぎ、既存のボタンの末尾に「安全にボタンを追記」するように大改修！
 if (!document.getElementById('add-breaker-btn')) {
     const intTools = document.getElementById('int-tools');
     if (intTools) {
@@ -70,6 +69,8 @@ if (!document.getElementById('add-breaker-btn')) {
 if (canvas) {
     canvas.addEventListener('mousedown', handleMouseDown); canvas.addEventListener('mousemove', handleMouseMove);
     canvas.addEventListener('mouseup', () => { draggedDevice = null; draggedRail = null; });
+    // ★新機能：ブラウザ標準の右クリックメニューが開くのを完全にブロック（ガード）
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 function animateLoop() { const continuing = updateDoorProgress(); draw(); if (continuing) requestAnimationFrame(animateLoop); }
 function draw() { if (ctx && canvas) drawAll(ctx, canvas, panelConfig, devices, wires, activeWiring, hoveredTerminal, dinRails); }
@@ -77,10 +78,19 @@ function draw() { if (ctx && canvas) drawAll(ctx, canvas, panelConfig, devices, 
 function handleMouseDown(e) {
     if (isAnimating) return;
     const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    
+    // ★新機能：配線中に右クリック（button === 2）されたら、その場で即座に配線をキャンセルして初期化！
+    if (currentMode === "interior" && activeWiring && e.button === 2) {
+        activeWiring = null; draw(); return;
+    }
+
     if (isPreviewMode) {
+        if (e.button === 2) return; // プレビュー中は右クリックを無視
         let hitDevice = null; for (let i = devices.length - 1; i >= 0; i--) { if (devices[i].layer === currentMode && devices[i].isMouseOver(mx, my)) { hitDevice = devices[i]; break; } }
         if (hitDevice) { if (['switch', 'lamp_switch'].includes(hitDevice.type)) { hitDevice.isON = true; activePressedDevice = hitDevice; } else { hitDevice.toggleAction(); } draw(); } return;
     }
+    if (e.button === 2) return; // 設計中の右クリックは配線キャンセル以外ではスルー
+
     if (currentMode === "interior") {
         if (!activeWiring) {
             for (let i = devices.length - 1; i >= 0; i--) { if (devices[i].layer === "interior") { const tIndex = devices[i].checkTerminalClick(mx, my); if (tIndex !== null) { activeWiring = { fromNode: devices[i], fromTerminal: tIndex, currentX: mx, currentY: my, points: [] }; draw(); return; } } }
