@@ -47,7 +47,6 @@ function runSequenceSimulation() {
 
     let totalResistance = 0;
     let hasCompleteLoop = false;
-
     let previousExcitedCoils = new Set();
 
     for (let loop = 0; loop < 8; loop++) {
@@ -96,7 +95,7 @@ function runSequenceSimulation() {
                 }
             }
             else if (currentDevice.type === 'relay') {
-                if (loop === 0 && (curr.terminalIndex === 11 || curr.terminalIndex === 12)) totalResistance += 1200;
+                if (loop === 0 && (curr.terminalIndex === 12 || curr.terminalIndex === 13)) totalResistance += 1200;
                 
                 let rON = previousExcitedCoils.has(currentDevice.id);
                 
@@ -114,10 +113,6 @@ function runSequenceSimulation() {
 
                 if (curr.terminalIndex === 7) { reachableLocalTerminals.push(3); }
                 else if (curr.terminalIndex === 3) { reachableLocalTerminals.push(7); }
-                
-                if (curr.terminalIndex === 11 || curr.terminalIndex === 12 || curr.terminalIndex === 13) {
-                    activeCoils.add(currentDevice.id);
-                }
             }
             else if (currentDevice.type === 'contactor') {
                 if (loop === 0 && (curr.terminalIndex === 0 || curr.terminalIndex === 1)) totalResistance += 500;
@@ -129,9 +124,6 @@ function runSequenceSimulation() {
                     if (curr.terminalIndex === 2) reachableLocalTerminals.push(7); if (curr.terminalIndex === 7) reachableLocalTerminals.push(2);
                 } else {
                     if (curr.terminalIndex === 6) reachableLocalTerminals.push(11); if (curr.terminalIndex === 11) reachableLocalTerminals.push(6);
-                }
-                if (curr.terminalIndex === 0 || curr.terminalIndex === 1) {
-                    activeCoils.add(currentDevice.id);
                 }
             }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(currentDevice.type)) {
@@ -157,13 +149,13 @@ function runSequenceSimulation() {
             let isPoweredThisLoop = false;
             
             if (d.type === 'relay') {
-                if (d.terminals[11]?.isLive && d.terminals[12]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals[12]?.isLive && d.terminals[13]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (d.type === 'contactor') {
                 if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (d.type === 'contact_block') {
-                if (d.extraConfig?.isEMO && d.terminals[2]?.isLive && d.terminals[3]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.extraConfig?.isEMO && d.terminals[4]?.isLive && d.terminals[5]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
                 else if (d.isLampElement && d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
