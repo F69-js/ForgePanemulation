@@ -16,7 +16,9 @@ let simWorker = null;
 try {
     simWorker = new Worker(new URL('./engine.js', import.meta.url), { type: 'module' });
     simWorker.onmessage = function(e) {
-        const { devices: simDevices, wires: simWires } = e.data;
+        // ★【バグ修正の大本命】Workerからの電流データ (totalAmp) を安全に受け取る
+        const { devices: simDevices, wires: simWires, totalAmp } = e.data;
+        
         simDevices.forEach(sd => {
             const target = context.devices.find(d => d.id === sd.id);
             if (target) {
@@ -27,17 +29,21 @@ try {
                 }
             }
         });
+        
         simWires.forEach(sw => { if (context.wires[sw.index]) { context.wires[sw.index].color = sw.isLive ? '#ff4757' : '#e74c3c'; } });
+        
+        // ★【完全連動】HTMLの追加を一切行わず、右メニューの h3 見出しをデジタル電流計へ動的トランスフォーム！
+        const menuHeader = document.querySelector('#right-menu h3');
+        if (menuHeader) {
+            menuHeader.innerText = `機器詳細設定 (SYSTEM: ${Number.isFinite(totalAmp) ? totalAmp.toFixed(3) : "0.000"} A)`;
+        }
+        
         draw();
     };
-    // app.js 内の simWorker.onmessage = function(e) { ... } の末尾付近に以下を追加
-const { devices: simDevices, wires: simWires, totalAmp } = e.data; // ← totalAmp を受け取るように変更
-
-// 画面の「機器詳細設定（右メニュー枠）」やタイトルバー等にアンペアをリアルタイムデジタル表示！
-const menuHeader = document.querySelector('#right-menu h3');
-if (menuHeader) menuHeader.innerText = `機器詳細設定 (SYSTEM: ${totalAmp.toFixed(3)} A)`;
-
-} catch (err) { console.error("Worker起動エラー:", err); }
+} catch (err) { 
+    // ★タイポ修正：内部変数を「err」に統一し、Worker起動前のReferenceErrorを完全根絶！
+    console.error("Worker起動エラー:", err); 
+}
 
 function pushToEngine(type = 'UPDATE') { if (!simWorker) return; simWorker.postMessage({ type: type, data: { devices: context.devices, wires: context.wires } }); }
 
@@ -61,37 +67,26 @@ document.getElementById('preview-mode-btn')?.addEventListener('click', (e) => {
 document.getElementById('view-btn')?.addEventListener('click', () => { if (!context.isPreviewMode && toggleDoorMode(context.devices)) { updateButtonStates(currentMode); animateLoop(); } });
 document.getElementById('add-rail-btn')?.addEventListener('click', () => { if (currentMode !== "interior" || context.isPreviewMode) return; context.dinRails.push({ id: Date.now(), y: 80, height: dinRailHeight }); draw(); });
 
-// ★【大改修】トビラ機器を追加した「その瞬間」に、裏面ペアもIDを完全にクロス紐付けして同時生成！
 document.getElementById('add-ext-device-btn')?.addEventListener('click', () => {
     if (context.isPreviewMode) return; const selectType = document.getElementById('select-ext-type').value;
     showAddDeviceMenu(selectType, (config) => {
-        const extDevice = new ControlDevice(Date.now(), selectType, 100, 150, config);
-        if (config.color) extDevice.color = config.color; if (config.label) extDevice.label = config.label;
-        if (config.unit) extDevice.unit = config.unit; if (config.positions) extDevice.positions = config.positions;
-        if (config.timeUnit) { extDevice.timeUnit = config.timeUnit; extDevice.timerMode = config.timerMode; }
+        const newDevice = new ControlDevice(Date.now(), selectType, 100, 150, config);
+        if (config.color) newDevice.color = config.color; if (config.label) newDevice.label = config.label;
+        if (config.unit) newDevice.unit = config.unit; if (config.positions) newDevice.positions = config.positions;
+        if (config.timeUnit) { newDevice.timeUnit = config.timeUnit; newDevice.timerMode = config.timerMode; }
         
-        // 裏面ブロック用の一意のIDを生成
         const intBlockId = Date.now() + Math.random();
         const isLamp = ['pilot_lamp', 'lamp_switch', 'lamp_selector'].includes(selectType);
         const isEMO = (selectType === 'emergency_stop');
         
-        // 裏面ブロックを全く同じ初期座標に生成し、お互いのIDをガッチリバインド！
         const intBlock = new ControlDevice(intBlockId, "contact_block", 100, 150, {
-            linkedDeviceId: extDevice.id, // 裏面から表面へのリンク
-            contactType: config.contactType || "NO",
-            isLampElement: isLamp,
-            isEMO: isEMO
+            linkedDeviceId: newDevice.id, contactType: config.contactType || "NO", isLampElement: isLamp, isEMO: isEMO
         });
         
-        extDevice.linkedDeviceId = intBlock.id; // 表面から裏面へのリンク
-        extDevice.hasLinkedBlock = true;
-        
-        // 表面パーツと裏面パーツを同時にシステム配列へ投入！
-        context.devices.push(extDevice, intBlock);
-        pushToEngine(); draw();
+        newDevice.linkedDeviceId = intBlock.id; newDevice.hasLinkedBlock = true;
+        context.devices.push(newDevice, intBlock); pushToEngine(); draw();
     });
 });
-
 document.getElementById('add-relay-btn')?.addEventListener('click', () => { if (context.isPreviewMode) return; context.devices.push(new ControlDevice(Date.now(), 'relay', 150, 100)); pushToEngine(); draw(); });
 document.getElementById('add-terminal-btn')?.addEventListener('click', () => { if (context.isPreviewMode) return; showAddDeviceMenu('terminal_block', (config) => { context.devices.push(new ControlDevice(Date.now(), 'terminal_block', 150, 100, config)); pushToEngine(); draw(); }); });
 
