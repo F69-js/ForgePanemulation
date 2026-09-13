@@ -92,7 +92,20 @@ if (!document.getElementById('add-breaker-btn')) {
 }
 
 document.getElementById('save-btn')?.addEventListener('click', () => savePanelToFile(context));
-document.getElementById('load-btn')?.addEventListener('click', () => loadPanelFromFile(context, ControlDevice, draw, pushToEngine));
+// ★大改修：ロードした瞬間に、壊れた配線の参照オブジェクトを「新インスタンス」へ完全結びつけ再構築！
+document.getElementById('load-btn')?.addEventListener('click', async () => {
+    await loadPanelFromFile(context, ControlDevice, draw, pushToEngine);
+    context.wires.forEach(w => {
+        w.fromNode = context.devices.find(d => d.id === w.fromNode.id) || w.fromNode;
+        w.toNode = context.devices.find(d => d.id === w.toNode.id) || w.toNode;
+    });
+    if (startScreen) startScreen.style.display = 'none';
+    if (menuModal) menuModal.style.display = 'none';
+    if (workspace) workspace.style.display = 'flex';
+    updateButtonStates(currentMode);
+    pushToEngine('INIT');
+    draw();
+});
 
 if (canvas) { initInputHandler(canvas, context, () => { pushToEngine(); draw(); }); }
 function animateLoop() { const continuing = updateDoorProgress(); draw(); if (continuing) requestAnimationFrame(animateLoop); }
