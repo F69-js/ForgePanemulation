@@ -1,23 +1,26 @@
 export class ControlDevice {
     constructor(id, type, x, y, extraConfig = {}) {
         this.id = id; 
-        this.type = type; // 'relay', 'switch', 'terminal_block', 'contact_block', 'pilot_lamp', 'selector_sw', 'lamp_switch', 'lamp_selector', 'key_switch', 'buzzer'
+        this.type = type; 
         this.x = x; 
         this.y = y;
         this.extraConfig = extraConfig;
         
-        // 外観機器か盤内機器かのレイヤー判定
         const extTypes = ['switch', 'pilot_lamp', 'selector_sw', 'lamp_switch', 'lamp_selector', 'key_switch', 'buzzer'];
         this.layer = extTypes.includes(type) ? 'exterior' : 'interior';
         
         this.linkedDeviceId = extraConfig.linkedDeviceId || null; 
         this.hasLinkedBlock = false; 
 
+        // ★初期のラベル文字を設定（右メニューから自由に変更可能にする）
+        if (this.layer === 'exterior') {
+            this.label = extraConfig.label || "SPARE";
+        }
+
         this.initSpecs();
     }
 
     initSpecs() {
-        // 1. 各機器ごとのサイズと基本色の定義
         if (this.type === 'relay') {
             this.width = 60; this.height = 90; this.color = '#e67e22'; this.name = 'MY4N RELAY';
             this.terminals = [{ name: "13 (コイル+)" }, { name: "14 (コイル-)" }, { name: "9 (COM/共通)" }, { name: "5 (NO/A接点)" }];
@@ -45,27 +48,22 @@ export class ControlDevice {
                 this.terminals = [{ name: "1 (入力ネジ)" }, { name: "2 (出力ネジ)" }];
             }
         }
-        // 外観機器群（正方形のφ30/22サイズを想定）
         else {
             this.width = 60; this.height = 60; this.terminals = [];
-            if (this.type === 'switch') { this.color = '#2ecc71'; this.name = 'PUSH SW'; }
-            else if (this.type === 'pilot_lamp') { this.color = '#e74c3c'; this.name = 'PILOT LAMP'; }
-            else if (this.type === 'selector_sw') { this.color = '#2c3e50'; this.name = 'SELECTOR'; }
-            else if (this.type === 'lamp_switch') { this.color = '#3498db'; this.name = 'ILLUM SW'; }
-            else if (this.type === 'lamp_selector') { this.color = '#2c3e50'; this.name = 'ILLUM SEL'; }
-            else if (this.type === 'key_switch') { this.color = '#2c3e50'; this.name = 'KEY SW'; }
-            else if (this.type === 'buzzer') { this.color = '#34495e'; this.name = 'BUZZER'; }
+            if (this.type === 'switch') { this.color = '#2ecc71'; this.name = 'PUSH SW'; if(!this.extraConfig.label) this.label = "START"; }
+            else if (this.type === 'pilot_lamp') { this.color = '#e74c3c'; this.name = 'PILOT LAMP'; if(!this.extraConfig.label) this.label = "FAULT"; }
+            else if (this.type === 'selector_sw') { this.color = '#2c3e50'; this.name = 'SELECTOR'; if(!this.extraConfig.label) this.label = "MANU/AUTO"; }
+            else if (this.type === 'lamp_switch') { this.color = '#3498db'; this.name = 'ILLUM SW'; if(!this.extraConfig.label) this.label = "RUN"; }
+            else if (this.type === 'lamp_selector') { this.color = '#2c3e50'; this.name = 'ILLUM SEL'; if(!this.extraConfig.label) this.label = "MODE"; }
+            else if (this.type === 'key_switch') { this.color = '#2c3e50'; this.name = 'KEY SW'; if(!this.extraConfig.label) this.label = "LOCK"; }
+            else if (this.type === 'buzzer') { this.color = '#34495e'; this.name = 'BUZZER'; if(!this.extraConfig.label) this.label = "ALARM"; }
         }
     }
 
-    // ネジ端子の相対座標を計算するロジック（データとして保持）
     getTerminalCoords(index) {
         if (this.type === 'terminal_block') {
             const poleIndex = Math.floor(index / 2);
-            return {
-                x: this.x + 25 + (poleIndex * 30),
-                y: (index % 2 === 1) ? this.y + this.height - 15 : this.y + 15
-            };
+            return { x: this.x + 25 + (poleIndex * 30), y: (index % 2 === 1) ? this.y + this.height - 15 : this.y + 15 };
         } 
         else if (this.type === 'contact_block') {
             return { x: this.x + this.width / 2, y: (index === 0) ? this.y + 10 : this.y + this.height - 10 };
@@ -89,6 +87,8 @@ export class ControlDevice {
     }
 
     isMouseOver(mx, my) {
-        return mx >= this.x && mx <= this.x + this.width && my >= this.y && my <= this.y + this.height;
+        // ツールチップ用のネームプレート領域（上に12px拡張）も含めてホバー判定を行うと操作しやすいです
+        const topBound = this.layer === 'exterior' ? this.y - 14 : this.y;
+        return mx >= this.x && mx <= this.x + this.width && my >= topBound && my <= this.y + this.height;
     }
 }
