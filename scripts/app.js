@@ -3,7 +3,6 @@ import { updateButtonStates, showAddDeviceMenu, showSelectedDeviceMenu, clearRig
 import { drawAll } from './draw.js';
 import { ControlDevice } from './classes/device.js';
 
-// 各画面要素を即座に取得（type="module"なので直下で安全に取得可能）
 const startScreen = document.getElementById('start-screen');
 const menuModal = document.getElementById('menu-modal');
 const workspace = document.getElementById('workspace');
@@ -14,17 +13,18 @@ let panelConfig = { name: "", phase: "" };
 let devices = [];
 let wires = [];
 
+// ★【新仕様】多段化DINレールを保持する配列管理へ変更（初期配置で1本目を登録）
+let dinRails = [{ id: 1, y: 240, height: 40 }];
+
 let draggedDevice = null;
 let offsetX = 0; let offsetY = 0;
 let activeWiring = null; 
 let hoveredTerminal = null;
 
-const dinRailY = 240;
 const dinRailHeight = 40;
 
-// --- 【修正】イベントリスナーを即時登録し、発火漏れを根絶する ---
+// --- DOMイベント直結バインド ---
 
-// 1. 新規設計ボタン
 const createBtn = document.getElementById('create-btn');
 if (createBtn) {
     createBtn.addEventListener('click', () => {
@@ -33,7 +33,6 @@ if (createBtn) {
     });
 }
 
-// 2. 盤を製造するボタン
 const buildBtn = document.getElementById('build-btn');
 if (buildBtn) {
     buildBtn.addEventListener('click', () => {
@@ -44,13 +43,13 @@ if (buildBtn) {
         if (menuModal) menuModal.style.display = 'none';
         if (workspace) workspace.style.display = 'flex';
 
-        // 初期メイン端子台の自動生成
+        // 初期メイン端子台の自動生成 (1本目のレール：dinRails[0].y にはめ込む)
         const mainPoles = (voltSelect.value === "AC 200V") ? 3 : 2;
-        const mainTerminal = new ControlDevice(Date.now(), 'terminal_block', 30, dinRailY, {
+        const mainTerminal = new ControlDevice(Date.now(), 'terminal_block', 30, dinRails[0].y, {
             poles: mainPoles,
             isMainPower: true
         });
-        mainTerminal.y = (dinRailY + dinRailHeight / 2) - mainTerminal.height / 2;
+        mainTerminal.y = (dinRails[0].y + dinRailHeight / 2) - mainTerminal.height / 2;
         devices.push(mainTerminal);
 
         updateButtonStates(currentMode);
@@ -58,7 +57,6 @@ if (buildBtn) {
     });
 }
 
-// 3. 中を開ける / トビラを閉める ボタン
 const viewBtn = document.getElementById('view-btn');
 if (viewBtn) {
     viewBtn.addEventListener('click', () => {
@@ -69,27 +67,46 @@ if (viewBtn) {
     });
 }
 
-// 4. トビラ機器を追加ボタン
+// ★【新仕様】「➕ DINレールを追加」ボタンのイベント
+const addRailBtn = document.getElementById('add-rail-btn');
+if (addRailBtn) {
+    addRailBtn.addEventListener('click', () => {
+        if (currentMode !== "interior") return;
+        // 現在の最後のレールの下に、120pxの間隔を空けて新しいレールを追加
+        const lastY = dinRails.length > 0 ? dinRails[dinRails.length - 1].y : 120;
+        const newY = Math.min(canvas.height - 60, lastY + 120);
+        
+        dinRails.push({
+            id: Date.now(),
+            y: newY,
+            height: dinRailHeight
+        });
+        draw();
+    });
+}
+
+// ★【新仕様】トビラ機器を追加ボタン (配置前に右メニューでバインディング設定を待つ仕様へ大改修)
 const addExtBtn = document.getElementById('add-ext-device-btn');
 if (addExtBtn) {
     addExtBtn.addEventListener('click', () => {
         const selectType = document.getElementById('select-ext-type').value;
         
-        if (['switch', 'lamp_switch'].includes(selectType)) {
-            showAddDeviceMenu('ext_switch', (config) => {
-                const newDevice = new ControlDevice(Date.now(), selectType, 100, 150, config);
-                devices.push(newDevice);
-                draw();
-            });
-        } else {
-            const newDevice = new ControlDevice(Date.now(), selectType, 100, 150);
+        // 配置パーツを生成する前に、まず右メニューのプレエディタを強制発動！
+        showAddDeviceMenu(selectType, (config) => {
+            // 右メニューで「配置 🛠️」が押されたら、初めて指定された文字や色を反映して召喚
+            const newDevice = new ControlDevice(Date.now(), selectType, 100, 150, config);
+            
+            // configから受け取った色や銘板を上書き設定
+            if (config.color) newDevice.color = config.color;
+            if (config.label) newDevice.label = config.label;
+            
             devices.push(newDevice);
             draw();
-        }
+        });
     });
 }
 
-// 5. リレーを追加ボタン
+// リレーを追加ボタン
 const addRelayBtn = document.getElementById('add-relay-btn');
 if (addRelayBtn) {
     addRelayBtn.addEventListener('click', () => {
@@ -99,7 +116,7 @@ if (addRelayBtn) {
     });
 }
 
-// 6. 可変端子台を追加ボタン
+// 可変端子台を追加ボタン (配置前の極数指定を反映)
 const addTerminalBtn = document.getElementById('add-terminal-btn');
 if (addTerminalBtn) {
     addTerminalBtn.addEventListener('click', () => {
@@ -111,14 +128,13 @@ if (addTerminalBtn) {
     });
 }
 
-// 7. Canvasマウスイベントバインド
 if (canvas) {
     canvas.addEventListener('mousedown', handleMouseDown);
     canvas.addEventListener('mousemove', handleMouseMove);
     canvas.addEventListener('mouseup', handleMouseUp);
 }
 
-// --- ループ・描画・マウス操作ロジック群 ---
+// --- ループ・描画・操作 ---
 function animateLoop() {
     const continuing = updateDoorProgress(); draw();
     if (continuing) requestAnimationFrame(animateLoop);
@@ -126,7 +142,8 @@ function animateLoop() {
 
 function draw() {
     if (ctx && canvas) {
-        drawAll(ctx, canvas, panelConfig, devices, wires, activeWiring, hoveredTerminal);
+        // ★修正：第8引数に多段化されたレール配列「dinRails」を確実に渡す
+        drawAll(ctx, canvas, panelConfig, devices, wires, activeWiring, hoveredTerminal, dinRails);
     }
 }
 
@@ -155,11 +172,12 @@ function handleMouseDown(e) {
         }
     }
     if (hitDevice) {
+        // 配置済みパーツをクリックした際、変更があったら即再描画するトリガー(draw)を渡す
         showSelectedDeviceMenu(hitDevice, (idToDelete) => {
             devices = devices.filter(d => d.id !== idToDelete);
             wires = wires.filter(w => w.fromNode.id !== idToDelete && w.toNode.id !== idToDelete);
             draw();
-        });
+        }, draw);
     } else { clearRightMenu(); }
     draw();
 }
@@ -171,14 +189,13 @@ function handleMouseMove(e) {
     if (draggedDevice) {
         let tx = mx - offsetX, ty = my - offsetY;
         if (currentMode === "interior" && draggedDevice.type !== 'switch') {
-            if (Math.abs((ty + draggedDevice.height / 2) - (dinRailY + dinRailHeight / 2)) < 40) {
-                ty = (dinRailY + dinRailHeight / 2) - draggedDevice.height / 2;
+            // ★仮のスナップ処理（現在は1本目のレールに固定。次の段で全レールをスキャンするlogic.jsへ移行します）
+            if (Math.abs((ty + draggedDevice.height / 2) - (dinRails[0].y + dinRailHeight / 2)) < 40) {
+                ty = (dinRails[0].y + dinRailHeight / 2) - draggedDevice.height / 2;
             }
         }
         draggedDevice.x = tx; draggedDevice.y = ty;
-        
         syncDevicePositions(draggedDevice, devices);
-        
         draw(); return;
     }
 
