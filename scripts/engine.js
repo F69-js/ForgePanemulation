@@ -24,7 +24,6 @@ function resetAllStates() {
         d.isPowered = false;
         if(d.terminals) d.terminals.forEach(t => t.isLive = false);
     });
-    // 電流値をゼロにして返却
     self.postMessage({ devices: [], wires: [], totalAmp: 0 });
 }
 
@@ -50,14 +49,14 @@ function runSequenceSimulation() {
     }
 
     let totalResistance = 0; // 回路全体の合成抵抗 (Ω)
-    let currentPathComps = []; // 電気が通過した負荷パーツのリスト
+    let hasCompleteLoop = false; // 回路が完全にRからNへ閉じているかのフラグ
 
     // 2. リレーのフィードバック走査ループ（収束計算）
     for (let loop = 0; loop < 8; loop++) {
         let visited = new Set(), queue = [];
         let activeCoils = new Set();
         
-        // 2P端子台の0番ネジ（R相）と2番ネジ（N相）の両方をスタート地点に指定
+        // 2P端子台の0番ネジ（R相＝プラス）と2番ネジ（N相＝マイナス）の両方をスタート地点に指定
         queue.push({ deviceId: mainPower.id, terminalIndex: 0 });
         queue.push({ deviceId: mainPower.id, terminalIndex: 2 });
 
@@ -76,11 +75,10 @@ function runSequenceSimulation() {
 
             let reachableLocalTerminals = [];
             
-            // --- 各コンポーネントの内部接点・導通および負荷（抵抗）計算ロジック ---
+            // --- 各コンポーネントの内部接点・導通ロジック ---
             if (currentDevice.type === 'terminal_block' || (currentDevice.type === 'breaker' && currentDevice.isON)) {
                 let pair = curr.terminalIndex % 2 === 0 ? curr.terminalIndex + 1 : curr.terminalIndex - 1;
                 reachableLocalTerminals.push(pair);
-                // 配線や金属バー自体の微小抵抗をシミュレート (1Ω)
                 if (loop === 0) totalResistance += 1;
             } 
             else if (currentDevice.type === 'contact_block') {
@@ -91,25 +89,23 @@ function runSequenceSimulation() {
                     if (curr.terminalIndex === 0 || curr.terminalIndex === 1) { if(isPressed) reachableLocalTerminals.push(curr.terminalIndex === 0 ? 1 : 0); }
                     else if (curr.terminalIndex === 2 || curr.terminalIndex === 3) { if(!isPressed) reachableLocalTerminals.push(curr.terminalIndex === 2 ? 3 : 2); }
                     else if (curr.terminalIndex === 4 || curr.terminalIndex === 5) { 
-                        activeCoils.add(currentDevice.id); 
-                        if (loop === 0) totalResistance += 800; // 非常停止内蔵ランプの抵抗 (800Ω)
+                        // ★修正点：上下両方の端子(4番と5番)に電気が届いているか後でチェックするため、ここでは即ONにしない
+                        if (loop === 0) totalResistance += 800;
                     }
                 } else if (currentDevice.isLampElement) {
-                    activeCoils.add(currentDevice.id);
-                    if (loop === 0) totalResistance += 800; // ランプソケットの固有抵抗 (800Ω)
+                    // ★修正点：上下両方の端子(0番と1番)に電気が届いているか後でチェックするため保留
+                    if (loop === 0) totalResistance += 800;
                 } else {
                     let canPass = (currentDevice.contactType === "NO" && isPressed) || (currentDevice.contactType === "NC" && !isPressed);
                     if (canPass) reachableLocalTerminals.push(curr.terminalIndex === 0 ? 1 : 0);
-                    if (canPass && loop === 0) totalResistance += 1; // 閉じている接点の接触抵抗
+                    if (canPass && loop === 0) totalResistance += 1;
                 }
             }
             else if (currentDevice.type === 'relay') {
-                if (curr.terminalIndex === 11 || curr.terminalIndex === 12 || curr.terminalIndex === 13) {
-                    activeCoils.add(currentDevice.id);
-                    if (loop === 0) totalResistance += 1200; // ミニリレーコイルの内部インピーダンス抵抗 (1200Ω)
-                }
+                // コイル端子 11番 と 12番 の両方に電気が届いているかチェックするため保留
+                if (loop === 0 && (curr.terminalIndex === 11 || curr.terminalIndex === 12)) totalResistance += 1200;
                 
-                let rON = currentDevice.isPowered || activeCoils.has(currentDevice.id);
+                let rON = currentDevice.isPowered;
                 
                 if (curr.terminalIndex === 8) { reachableLocalTerminals.push(rON ? 0 : 4); }
                 else if (curr.terminalIndex === 4 && !rON) { reachableLocalTerminals.push(8); }
@@ -127,11 +123,9 @@ function runSequenceSimulation() {
                 else if (curr.terminalIndex === 3) { reachableLocalTerminals.push(7); }
             }
             else if (currentDevice.type === 'contactor') {
-                if (curr.terminalIndex === 0 || curr.terminalIndex === 1) {
-                    activeCoils.add(currentDevice.id);
-                    if (loop === 0) totalResistance += 500; // 電磁接触器大型操作コイルのインピーダンス (500Ω)
-                }
-                let mON = currentDevice.isPowered || activeCoils.has(currentDevice.id);
+                // 操作コイル 0番 と 1番 のチェック用
+                if (loop === 0 && (curr.terminalIndex === 0 || curr.terminalIndex === 1)) totalResistance += 500;
+                let mON = currentDevice.isPowered;
                 if (mON) {
                     if (curr.terminalIndex === 3) reachableLocalTerminals.push(8); if (curr.terminalIndex === 8) reachableLocalTerminals.push(3);
                     if (curr.terminalIndex === 4) reachableLocalTerminals.push(9); if (curr.terminalIndex === 9) reachableLocalTerminals.push(4);
@@ -142,8 +136,7 @@ function runSequenceSimulation() {
                 }
             }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(currentDevice.type)) {
-                activeCoils.add(currentDevice.id);
-                if (loop === 0) totalResistance += 1000; // 各種電子計器・表示灯の平均インピーダンス負荷 (1000Ω)
+                if (loop === 0) totalResistance += 1000;
             }
 
             reachableLocalTerminals.forEach(tIdx => {
@@ -161,20 +154,37 @@ function runSequenceSimulation() {
             });
         }
 
+        // ★【本物の閉回路判定】BFS走査が終わったあと、「負荷機器の上下両方のネジに電気が届いているか」を厳格にチェック！
         devices.forEach(d => {
-            d.isPowered = activeCoils.has(d.id);
+            let isPoweredThisLoop = false;
+            
+            if (d.type === 'relay') {
+                // リレーソケットの11番と12番（実機の13,14番ピン）の両方に電気が到達していたらON
+                if (d.terminals[11]?.isLive && d.terminals[12]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+            }
+            else if (d.type === 'contactor') {
+                // 電磁接触器の0番と1番（操作コイル A1, A2）の両方に電気が到達していたらON
+                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+            }
+            else if (d.type === 'contact_block') {
+                if (d.extraConfig?.isEMO && d.terminals[4]?.isLive && d.terminals[5]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                else if (d.isLampElement && d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+            }
+            else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
+                // 一般のトビラ機器は0番端子と1番端子の両方に電気が届いていればON
+                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+            }
+            
+            d.isPowered = isPoweredThisLoop;
         });
     }
 
-    // ★【新仕様】BitGateCAD風オームの法則（I = V / R）によるリアルタイム電流量（A）の計算！
-    // 制御盤の標準操作電圧 100V 想定。負荷がなければ（ショート状態でなければ）電流量を割り出す
-    const finalResistance = Math.max(totalResistance, 1);
-    const calculatedAmp = 100 / finalResistance;
+    // ★回路が完全に一周閉じていない（片線だけ）なら、電流量は厳格に 0A にロック！
+    const finalAmp = hasCompleteLoop ? (100 / Math.max(totalResistance, 1)) : 0;
 
-    // 計算終了。電流量（calculatedAmp）も一緒にパッケージしてメイン画面へ高速通知！
     self.postMessage({
         devices: devices.map(d => ({ id: d.id, isON: d.isON, currentPosIndex: d.currentPosIndex, isPowered: d.isPowered })),
         wires: wires.map((w, idx) => ({ index: idx, isLive: isTerminalLive(w.fromNode.id, w.fromTerminal) || isTerminalLive(w.toNode.id, w.toTerminal) })),
-        totalAmp: calculatedAmp // これで画面に電流量が表示されます
+        totalAmp: finalAmp
     });
 }
