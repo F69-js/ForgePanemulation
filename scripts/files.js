@@ -14,7 +14,7 @@ export async function savePanelToFile(context) {
             devices: context.devices.map(d => ({
                 id: d.id, type: d.type, x: d.x, y: d.y, isON: d.isON,
                 currentPosIndex: d.currentPosIndex, label: d.label, color: d.color,
-                unit: d.unit, timeUnit: d.timeUnit, timerMode: d.timerMode, extraConfig: d.extraConfig
+                unit: d.unit, timeUnit: d.timeUnit, timerMode: d.timerMode, extraConfig: d.extraConfig, linkedDeviceId: d.linkedDeviceId, hasLinkedBlock: d.hasLinkedBlock
             })),
             wires: context.wires.map(w => ({
                 fromNodeId: w.fromNode.id, fromTerminal: w.fromTerminal,
@@ -47,13 +47,15 @@ export async function loadPanelFromFile(context, ControlDevice, draw, pushToEngi
             const dev = new ControlDevice(d.id, d.type, d.x, d.y, d.extraConfig || {});
             dev.isON = d.isON || false;
             dev.currentPosIndex = d.currentPosIndex || 0;
+            dev.linkedDeviceId = d.linkedDeviceId || null;
+            dev.hasLinkedBlock = d.hasLinkedBlock || false;
             if (d.label) dev.label = d.label;
             if (d.color) dev.color = d.color;
             if (d.unit) dev.unit = d.unit;
             if (d.timeUnit) { dev.timeUnit = d.timeUnit; dev.timerMode = d.timerMode; }
             return dev;
         });
-        context.wires = [];
+        context.wires.length = 0;
         (data.wires || []).forEach(w => {
             const fromNode = context.devices.find(d => d.id === w.fromNodeId);
             const toNode = context.devices.find(d => d.id === w.toNodeId);
