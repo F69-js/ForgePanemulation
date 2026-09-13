@@ -180,4 +180,4 @@ function handleMouseMove(e) {
     if (currentMode === "interior" && doorOpenProgress === 1 && !activeWiring && !isPreviewMode) {
         for (let i = devices.length - 1; i >= 0; i--) {
             if (devices[i].layer !== "interior") continue;
-if (tIndex !== null) { foundHover = { device: devices[i], terminalIndex: tIndex }; break; }}}if (JSON.stringify(hoveredTerminal) !== JSON.stringify(foundHover)) { hoveredTerminal = foundHover; draw(); }}function handleMouseUp() {// ★新仕様：プレビューモード中、押し下げていたモーメンタリボタンから手を離したら自動でOFF（元の戻る）if (isPreviewMode && activePressedDevice) {activePressedDevice.isON = false;activePressedDevice = null;draw();}draggedDevice = null;}
+if (tIndex !== null) { foundHover = { device: devices[i], terminalIndex: tIndex }; break; }}}if (JSON.stringify(hoveredTerminal) !== JSON.stringify(foundHover)) { hoveredTerminal = foundHover; draw(); }}function handleMouseUp() {if (isPreviewMode && activePressedDevice) {activePressedDevice.isON = false;activePressedDevice = null;draw();}draggedDevice = null;}
