@@ -85,4 +85,4 @@ export function showSelectedDeviceMenu(device, onDelete, onUpdate) {
         if (selectC) selectC.addEventListener('change', () => { device.color = selectC.value; onUpdate(); });
     }
     document.getElementById('btn-delete-device').addEventListener('click', () => { onDelete(device.id); clearRightMenu(); });
-}
+} 
