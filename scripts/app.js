@@ -8,6 +8,29 @@ let panelConfig = { name: "", phase: "" }, devices = [], wires = [], dinRails = 
 let draggedDevice = null, offsetX = 0, offsetY = 0, activeWiring = null, hoveredTerminal = null;
 const dinRailHeight = 40;
 
+// ★新仕様：プレビューモード管理フラグ
+let isPreviewMode = false;
+let activePressedDevice = null; // 現在マウスで押し下げ中のモーメンタリボタン
+
+document.getElementById('preview-mode-btn')?.addEventListener('click', (e) => {
+    isPreviewMode = !isPreviewMode;
+    const btn = e.target;
+    if (isPreviewMode) {
+        btn.innerText = "⏹️ プレビュー停止";
+        btn.style.background = "linear-gradient(135deg, #e67e22, #d35400)";
+        if (extTools) document.getElementById('ext-tools').style.display = "none";
+        if (intTools) document.getElementById('int-tools').style.display = "none";
+        activeWiring = null; draggedDevice = null; clearRightMenu();
+    } else {
+        btn.innerText = "▶️ プレビュー開始";
+        btn.style.background = "linear-gradient(135deg, #2ecc71, #27ae60)";
+        // 通常の状態表示へ戻す
+        devices.forEach(d => { d.isON = false; }); // 押し下げ状態をリセット
+        updateButtonStates(currentMode);
+    }
+    draw();
+});
+
 document.getElementById('create-btn')?.addEventListener('click', () => {
     if (startScreen) startScreen.style.display = 'none'; if (menuModal) menuModal.style.display = 'block';
 });
@@ -24,16 +47,18 @@ document.getElementById('build-btn')?.addEventListener('click', () => {
 });
 
 document.getElementById('view-btn')?.addEventListener('click', () => {
+    if (isPreviewMode) return; // プレビュー中はドア開閉をロックして安全確保
     if (toggleDoorMode(devices)) { updateButtonStates(currentMode); animateLoop(); }
 });
 
 document.getElementById('add-rail-btn')?.addEventListener('click', () => {
-    if (currentMode !== "interior") return;
+    if (currentMode !== "interior" || isPreviewMode) return;
     const lastY = dinRails.length > 0 ? dinRails[dinRails.length - 1].y : 120;
     dinRails.push({ id: Date.now(), y: Math.min(canvas.height - 60, lastY + 120), height: dinRailHeight }); draw();
 });
 
 document.getElementById('add-ext-device-btn')?.addEventListener('click', () => {
+    if (isPreviewMode) return;
     const selectType = document.getElementById('select-ext-type').value;
     showAddDeviceMenu(selectType, (config) => {
         const newDevice = new ControlDevice(Date.now(), selectType, 100, 150, config);
@@ -45,11 +70,11 @@ document.getElementById('add-ext-device-btn')?.addEventListener('click', () => {
 });
 
 document.getElementById('add-relay-btn')?.addEventListener('click', () => {
-    devices.push(new ControlDevice(Date.now(), 'relay', 150, 100)); draw();
+    if (isPreviewMode) return; devices.push(new ControlDevice(Date.now(), 'relay', 150, 100)); draw();
 });
 
 document.getElementById('add-terminal-btn')?.addEventListener('click', () => {
-    showAddDeviceMenu('terminal_block', (config) => { devices.push(new ControlDevice(Date.now(), 'terminal_block', 150, 100, config)); draw(); });
+    if (isPreviewMode) return; showAddDeviceMenu('terminal_block', (config) => { devices.push(new ControlDevice(Date.now(), 'terminal_block', 150, 100, config)); draw(); });
 });
 
 if (!document.getElementById('add-breaker-btn')) {
@@ -58,16 +83,16 @@ if (!document.getElementById('add-breaker-btn')) {
         <button class="btn" id="add-contactor-btn" style="background:linear-gradient(135deg,#7f8c8d,#57606f)">+ 電磁接触器</button>
     `);
     document.getElementById('add-breaker-btn')?.addEventListener('click', () => {
-        showAddDeviceMenu('breaker', (config) => { devices.push(new ControlDevice(Date.now(), 'breaker', 200, 100, config)); draw(); });
+        if (isPreviewMode) return; showAddDeviceMenu('breaker', (config) => { devices.push(new ControlDevice(Date.now(), 'breaker', 200, 100, config)); draw(); });
     });
     document.getElementById('add-contactor-btn')?.addEventListener('click', () => {
-        devices.push(new ControlDevice(Date.now(), 'contactor', 200, 100)); draw();
+        if (isPreviewMode) return; devices.push(new ControlDevice(Date.now(), 'contactor', 200, 100)); draw();
     });
 }
 
 if (canvas) {
     canvas.addEventListener('mousedown', handleMouseDown); canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('mouseup', () => { draggedDevice = null; });
+    canvas.addEventListener('mouseup', handleMouseUp);
 }
 
 function animateLoop() { const continuing = updateDoorProgress(); draw(); if (continuing) requestAnimationFrame(animateLoop); }
@@ -77,6 +102,28 @@ function handleMouseDown(e) {
     if (isAnimating) return;
     const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
     
+    // --- 1. プレビューモード中のクリックアクション ---
+    if (isPreviewMode) {
+        let hitDevice = null;
+        for (let i = devices.length - 1; i >= 0; i--) {
+            if (devices[i].layer !== currentMode) continue;
+            if (devices[i].isMouseOver(mx, my)) { hitDevice = devices[i]; break; }
+        }
+        if (hitDevice) {
+            // 押しボタン、照光ボタンは「マウスを押した瞬間にON（凹む）」
+            if (['switch', 'lamp_switch'].includes(hitDevice.type)) {
+                hitDevice.isON = true;
+                activePressedDevice = hitDevice; // 離したときに戻すため記憶
+            } else {
+                // セレクタースイッチや非常停止、ブレーカーなどはクリックするたびに状態をカチッと維持
+                hitDevice.toggleAction();
+            }
+            draw();
+        }
+        return;
+    }
+
+    // --- 2. 通常の設計モード中のドラッグ・配線ロジック ---
     if (currentMode === "interior") {
         if (!activeWiring) {
             for (let i = devices.length - 1; i >= 0; i--) {
@@ -106,24 +153,13 @@ function handleMouseDown(e) {
         }
     }
     
-    // ★【大改修】表面（外観モード）のとき、または盤内で配線中でないとき
     if (!activeWiring) {
         let hitDevice = null;
         for (let i = devices.length - 1; i >= 0; i--) {
             if (devices[i].layer !== currentMode) continue;
-            if (devices[i].isMouseOver(mx, my)) {
-                hitDevice = devices[i]; break;
-            }
+            if (devices[i].isMouseOver(mx, my)) { hitDevice = devices[i]; break; }
         }
-        
         if (hitDevice) {
-            // A. 外観モード（ドアが閉まっているとき）➔ 機器を移動させず、カチカチ動作させる！
-            if (currentMode === "exterior" && doorOpenProgress === 0) {
-                hitDevice.toggleAction(); // ボタン凹み・ノブ回転
-                draw();
-                return;
-            }
-            // B. 内部モード ➔ 通常通りドラッグ移動させる
             draggedDevice = hitDevice; offsetX = mx - draggedDevice.x; offsetY = my - draggedDevice.y;
             devices.splice(devices.indexOf(draggedDevice), 1); devices.push(draggedDevice);
             showSelectedDeviceMenu(hitDevice, (id) => { devices = devices.filter(d => d.id !== id); wires = wires.filter(w => w.fromNode.id !== id && w.toNode.id !== id); draw(); }, draw);
@@ -135,18 +171,13 @@ function handleMouseDown(e) {
 function handleMouseMove(e) {
     const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
     if (activeWiring) { activeWiring.currentX = mx; activeWiring.currentY = my; draw(); return; }
-    if (draggedDevice) {
+    if (draggedDevice && !isPreviewMode) {
         let tx = mx - offsetX, ty = my - offsetY;
         if (currentMode === "interior" && !['switch', 'analog_meter', 'digital_controller', 'panel_timer'].includes(draggedDevice.type)) { ty = snapToClosestRail(draggedDevice, dinRails, ty); }
         draggedDevice.x = tx; draggedDevice.y = ty; syncDevicePositions(draggedDevice, devices); draw(); return;
     }
     let foundHover = null;
-    if (currentMode === "interior" && doorOpenProgress === 1 && !activeWiring) {
+    if (currentMode === "interior" && doorOpenProgress === 1 && !activeWiring && !isPreviewMode) {
         for (let i = devices.length - 1; i >= 0; i--) {
             if (devices[i].layer !== "interior") continue;
-            const tIndex = devices[i].checkTerminalClick(mx, my);
-            if (tIndex !== null) { foundHover = { device: devices[i], terminalIndex: tIndex }; break; }
-        }
-    }
-    if (JSON.stringify(hoveredTerminal) !== JSON.stringify(foundHover)) { hoveredTerminal = foundHover; draw(); }
-}
+if (tIndex !== null) { foundHover = { device: devices[i], terminalIndex: tIndex }; break; }}}if (JSON.stringify(hoveredTerminal) !== JSON.stringify(foundHover)) { hoveredTerminal = foundHover; draw(); }}function handleMouseUp() {// ★新仕様：プレビューモード中、押し下げていたモーメンタリボタンから手を離したら自動でOFF（元の戻る）if (isPreviewMode && activePressedDevice) {activePressedDevice.isON = false;activePressedDevice = null;draw();}draggedDevice = null;}
