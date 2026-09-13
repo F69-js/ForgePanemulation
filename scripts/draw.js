@@ -169,3 +169,4 @@ function drawTerminalTooltip(ctx, info) {
     ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, coords.x, by + bh / 2);
     ctx.restore();
 }
+ 
