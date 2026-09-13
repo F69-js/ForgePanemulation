@@ -11,7 +11,6 @@ const dinRailHeight = 40;
 let isPreviewMode = false;
 let activePressedDevice = null;
 
-// ★新仕様：「➕ DINレールを追加」ボタンを押した際、レール自体のドラッグ配置用にダミーオブジェクト風にプッシュ
 document.getElementById('add-rail-btn')?.addEventListener('click', () => {
     if (currentMode !== "interior" || isPreviewMode) return;
     dinRails.push({ id: Date.now(), y: 80, height: dinRailHeight }); draw();
@@ -48,6 +47,26 @@ document.getElementById('add-ext-device-btn')?.addEventListener('click', () => {
 document.getElementById('add-relay-btn')?.addEventListener('click', () => { devices.push(new ControlDevice(Date.now(), 'relay', 150, 100)); draw(); });
 document.getElementById('add-terminal-btn')?.addEventListener('click', () => { showAddDeviceMenu('terminal_block', (config) => { devices.push(new ControlDevice(Date.now(), 'terminal_block', 150, 100, config)); draw(); }); });
 
+// ★【修正バグ】insertAdjacentHTML のオーバーライド破壊を防ぎ、既存のボタンの末尾に「安全にボタンを追記」するように大改修！
+if (!document.getElementById('add-breaker-btn')) {
+    const intTools = document.getElementById('int-tools');
+    if (intTools) {
+        const divContainer = document.createElement('div');
+        divContainer.style.display = "inline-flex"; divContainer.style.gap = "8px"; divContainer.style.marginLeft = "8px";
+        divContainer.innerHTML = `
+            <button class="btn" id="add-breaker-btn" style="background:linear-gradient(135deg,#2c3e50,#1a252f)">+ ブレーカー</button>
+            <button class="btn" id="add-contactor-btn" style="background:linear-gradient(135deg,#7f8c8d,#57606f)">+ 電磁接触器</button>
+        `;
+        intTools.appendChild(divContainer);
+    }
+    document.getElementById('add-breaker-btn')?.addEventListener('click', () => {
+        if (isPreviewMode) return; showAddDeviceMenu('breaker', (config) => { devices.push(new ControlDevice(Date.now(), 'breaker', 200, 100, config)); draw(); });
+    });
+    document.getElementById('add-contactor-btn')?.addEventListener('click', () => {
+        if (isPreviewMode) return; devices.push(new ControlDevice(Date.now(), 'contactor', 200, 100)); draw();
+    });
+}
+
 if (canvas) {
     canvas.addEventListener('mousedown', handleMouseDown); canvas.addEventListener('mousemove', handleMouseMove);
     canvas.addEventListener('mouseup', () => { draggedDevice = null; draggedRail = null; });
@@ -58,19 +77,14 @@ function draw() { if (ctx && canvas) drawAll(ctx, canvas, panelConfig, devices, 
 function handleMouseDown(e) {
     if (isAnimating) return;
     const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
-    
     if (isPreviewMode) {
         let hitDevice = null; for (let i = devices.length - 1; i >= 0; i--) { if (devices[i].layer === currentMode && devices[i].isMouseOver(mx, my)) { hitDevice = devices[i]; break; } }
         if (hitDevice) { if (['switch', 'lamp_switch'].includes(hitDevice.type)) { hitDevice.isON = true; activePressedDevice = hitDevice; } else { hitDevice.toggleAction(); } draw(); } return;
     }
-
     if (currentMode === "interior") {
         if (!activeWiring) {
-            // ネジ端子
             for (let i = devices.length - 1; i >= 0; i--) { if (devices[i].layer === "interior") { const tIndex = devices[i].checkTerminalClick(mx, my); if (tIndex !== null) { activeWiring = { fromNode: devices[i], fromTerminal: tIndex, currentX: mx, currentY: my, points: [] }; draw(); return; } } }
-            // 配線の中点
             for (let w of wires) { if (w.points) { for (let pt of w.points) { if (Math.hypot(mx - pt.x, my - pt.y) < 8) { activeWiring = { fromNode: w.fromNode, fromTerminal: w.fromTerminal, currentX: mx, currentY: my, points: [{ x: pt.x, y: pt.y }] }; draw(); return; } } } }
-            // ★新仕様：DINレール自体のクリック・上下ドラッグ判定
             for (let rail of dinRails) { if (my >= rail.y && my <= rail.y + rail.height) { draggedRail = rail; offsetY = my - rail.y; return; } }
         } else {
             let hitTD = null, hitTI = null; for (let i = devices.length - 1; i >= 0; i--) { if (devices[i].layer === "interior") { const tIndex = devices[i].checkTerminalClick(mx, my); if (tIndex !== null) { hitTD = devices[i]; hitTI = tIndex; break; } } }
@@ -78,7 +92,6 @@ function handleMouseDown(e) {
             else { activeWiring.points.push({ x: mx, y: my }); draw(); return; }
         }
     }
-    
     if (!activeWiring) {
         let hitDevice = null; for (let i = devices.length - 1; i >= 0; i--) { if (devices[i].layer === currentMode && devices[i].isMouseOver(mx, my)) { hitDevice = devices[i]; break; } }
         if (hitDevice) { draggedDevice = hitDevice; offsetX = mx - draggedDevice.x; offsetY = my - draggedDevice.y; devices.splice(devices.indexOf(draggedDevice), 1); devices.push(draggedDevice); showSelectedDeviceMenu(hitDevice, (id) => { devices = devices.filter(d => d.id !== id); wires = wires.filter(w => w.fromNode.id !== id && w.toNode.id !== id); draw(); }, draw); } 
@@ -90,14 +103,12 @@ function handleMouseDown(e) {
 function handleMouseMove(e) {
     const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
     if (activeWiring) { activeWiring.currentX = mx; activeWiring.currentY = my; draw(); return; }
-    // ★新仕様：DINレールのドラッグ移動追従
     if (draggedRail) { draggedRail.y = Math.max(40, Math.min(canvas.height - dinRailHeight, my - offsetY)); draw(); return; }
     if (draggedDevice) {
         let tx = mx - offsetX, ty = my - offsetY;
         if (currentMode === "interior" && !['switch', 'analog_meter', 'digital_controller', 'panel_timer'].includes(draggedDevice.type)) { ty = snapToClosestRail(draggedDevice, dinRails, ty); }
         draggedDevice.x = tx; draggedDevice.y = ty; syncDevicePositions(draggedDevice, devices); draw(); return;
     }
-    // ★修正：配線中でない限り、ネジ極性表示（ツールチップ）を100%確実にアクティブ計算する
     let foundHover = null;
     if (currentMode === "interior" && doorOpenProgress === 1 && !activeWiring) {
         for (let i = devices.length - 1; i >= 0; i--) {
