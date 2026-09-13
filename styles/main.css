@@ -2,13 +2,17 @@
     --bg: #1e272e;
     --panel: #d5d8dc;
     --door: #b2bec3;
+    --menu-bg: #2c3e50;
+    --btn-primary: #3498db;
+    --btn-hover: #2980b9;
 }
 
 body {
     margin: 0;
+    padding: 0;
     background: var(--bg);
     color: #ecf0f1;
-    font-family: sans-serif;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -18,18 +22,23 @@ body {
 
 .btn {
     padding: 12px 24px;
-    background: linear-gradient(135deg, #3498db, #2980b9);
+    background: linear-gradient(135deg, var(--btn-primary), var(--btn-hover));
     color: white;
     border: none;
     border-radius: 6px;
     cursor: pointer;
     font-weight: bold;
     box-shadow: 0 4px 15px rgba(52, 152, 219, .4);
-    transition: transform .2s;
+    transition: transform .2s, box-shadow .2s;
 }
 
 .btn:hover {
     transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(52, 152, 219, .6);
+}
+
+.btn:active {
+    transform: translateY(1px);
 }
 
 #start-screen {
@@ -45,11 +54,19 @@ body {
 
 #menu-modal {
     display: none;
-    background: #2c3e50;
+    background: var(--menu-bg);
     padding: 30px;
     border-radius: 12px;
     box-shadow: 0 15px 50px rgba(0, 0, 0, .6);
-    width: 320px;
+    width: 340px;
+}
+
+#menu-modal h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 1.3rem;
+    border-bottom: 2px solid #34495e;
+    padding-bottom: 10px;
 }
 
 .form-group {
@@ -74,10 +91,24 @@ body {
     font-size: 1rem;
 }
 
+.form-group input:focus, .form-group select:focus {
+    outline: none;
+    border-color: var(--btn-primary);
+}
+
 #workspace {
     display: none;
     flex-direction: column;
     align-items: center;
+    gap: 20px;
+}
+
+/* Canvasと右メニューを横に並べるコンテナ */
+#workspace-container {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    align-items: flex-start;
 }
 
 #canvas-container {
@@ -97,11 +128,40 @@ canvas:active {
     cursor: grabbing;
 }
 
+/* ★右側の可変詳細設定メニューのスタイル */
+#right-menu {
+    width: 240px;
+    height: 550px;
+    background: var(--menu-bg);
+    border-radius: 6px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, .4);
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+#right-menu h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+    border-bottom: 2px solid #34495e;
+    padding-bottom: 8px;
+    color: #fff;
+}
+
+#menu-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
 .toolbar {
-    margin-top: 20px;
     display: flex;
     gap: 15px;
-    background: #2c3e50;
+    background: var(--menu-bg);
     padding: 10px 20px;
     border-radius: 30px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
 }
