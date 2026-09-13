@@ -3,6 +3,11 @@ import { updateButtonStates, showAddDeviceMenu, showSelectedDeviceMenu, clearRig
 import { drawAll } from './draw.js';
 import { ControlDevice } from './classes/device.js';
 
+// HTML上の各画面要素を確実に取得
+const startScreen = document.getElementById('start-screen');
+const menuModal = document.getElementById('menu-modal');
+const workspace = document.getElementById('workspace');
+
 const canvas = document.getElementById('panelCanvas');
 const ctx = canvas.getContext('2d');
 let panelConfig = { name: "", phase: "" };
@@ -18,18 +23,20 @@ const dinRailY = 240;
 const dinRailHeight = 40;
 
 window.addEventListener('DOMContentLoaded', () => {
+    // 1. スタート画面からメニューへの遷移（修正：定義エラーを解消）
     document.getElementById('create-btn').addEventListener('click', () => {
         startScreen.style.display = 'none';
         menuModal.style.display = 'block';
     });
 
+    // 2. 製造（ビルド）ボタン押下時
     document.getElementById('build-btn').addEventListener('click', () => {
         panelConfig.name = document.getElementById('panel-name').value.toUpperCase();
         const voltSelect = document.getElementById('panel-voltage');
         panelConfig.phase = (voltSelect.value === "AC 200V") ? "3Φ3W (三相3線)" : "1Φ2W (単相2線)";
         
-        document.getElementById('menu-modal').style.display = 'none';
-        document.getElementById('workspace').style.display = 'flex';
+        menuModal.style.display = 'none';
+        workspace.style.display = 'flex';
 
         // 初期メイン端子台の自動生成
         const mainPoles = (voltSelect.value === "AC 200V") ? 3 : 2;
@@ -44,7 +51,7 @@ window.addEventListener('DOMContentLoaded', () => {
         draw();
     });
 
-    // 開閉ボタン
+    // 3. 開閉ボタン
     document.getElementById('view-btn').addEventListener('click', () => {
         if (toggleDoorMode(devices)) {
             updateButtonStates(currentMode);
@@ -52,27 +59,28 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // ★【修正】セレクトボックスから選択されたトビラ機器を追加する処理
-    document.getElementById('add-ext-device-btn').addEventListener('click', () => {
-        const selectType = document.getElementById('select-ext-type').value;
-        
-        // 外部から裏側への接点設定が必要なタイプかを判定
-        if (['switch', 'lamp_switch'].includes(selectType)) {
-            // 接点構成（NO/NC）を選ぶメニューを右側に動的生成
-            showAddDeviceMenu('ext_switch', (config) => {
-                const newDevice = new ControlDevice(Date.now(), selectType, 100, 150, config);
+    // 4. 【IDエラー修正】トビラ用機器の追加ボタンイベント
+    const addExtBtn = document.getElementById('add-ext-device-btn');
+    if (addExtBtn) {
+        addExtBtn.addEventListener('click', () => {
+            const selectType = document.getElementById('select-ext-type').value;
+            
+            // 裏側への接点設定が必要なタイプかを判定
+            if (['switch', 'lamp_switch'].includes(selectType)) {
+                showAddDeviceMenu('ext_switch', (config) => {
+                    const newDevice = new ControlDevice(Date.now(), selectType, 100, 150, config);
+                    devices.push(newDevice);
+                    draw();
+                });
+            } else {
+                const newDevice = new ControlDevice(Date.now(), selectType, 100, 150);
                 devices.push(newDevice);
                 draw();
-            });
-        } else {
-            // 設定不要な機器（ランプやブザー等）は即座に配置
-            const newDevice = new ControlDevice(Date.now(), selectType, 100, 150);
-            devices.push(newDevice);
-            draw();
-        }
-    });
+            }
+        });
+    }
 
-    // 内部パーツ追加ボタン
+    // 5. 内部パーツ追加ボタン
     document.getElementById('add-relay-btn').addEventListener('click', () => {
         const newDevice = new ControlDevice(Date.now(), 'relay', 150, 100);
         devices.push(newDevice);
@@ -148,7 +156,7 @@ function handleMouseMove(e) {
         }
         draggedDevice.x = tx; draggedDevice.y = ty;
         
-        // ★【新機能】ドラッグ時に双方向の表裏位置をリアルタイム完全同期！
+        // ドラッグ時に双方向の表裏位置をリアルタイム完全同期
         syncDevicePositions(draggedDevice, devices);
         
         draw(); return;
