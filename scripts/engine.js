@@ -11,7 +11,6 @@ self.onmessage = function(e) {
         isSimulating = false;
         resetAllStates();
     }
-    
     if (isSimulating) {
         runSequenceSimulation();
     }
@@ -47,11 +46,10 @@ function runSequenceSimulation() {
 
     let totalResistance = 0;
     let hasCompleteLoop = false;
-    let previousExcitedCoils = new Set();
+    let excitedCoils = new Set();
 
     for (let loop = 0; loop < 8; loop++) {
         let visited = new Set(), queue = [];
-        let activeCoils = new Set();
         
         queue.push({ deviceId: mainPower.id, terminalIndex: 0 });
         queue.push({ deviceId: mainPower.id, terminalIndex: 2 });
@@ -94,13 +92,14 @@ function runSequenceSimulation() {
                     if (canPass && loop === 0) totalResistance += 1;
                 }
             }
+            // ★大改修：C接点の先読み電位差チェックを最適化し、NO/NCが確実に背反開閉するよう設計！
             else if (currentDevice.type === 'relay') {
                 if (loop === 0 && (curr.terminalIndex === 12 || curr.terminalIndex === 13)) totalResistance += 1200;
                 
-                let rON = previousExcitedCoils.has(currentDevice.id) || currentDevice.isPowered;
+                let rON = excitedCoils.has(currentDevice.id);
                 
                 if (curr.terminalIndex === 8) {
-                    if (rON) { reachableLocalTerminals.push(0); } else { reachableLocalTerminals.push(4); }
+                    reachableLocalTerminals.push(rON ? 0 : 4);
                 } else if (curr.terminalIndex === 0) {
                     if (rON) reachableLocalTerminals.push(8);
                 } else if (curr.terminalIndex === 4) {
@@ -108,7 +107,7 @@ function runSequenceSimulation() {
                 }
                 
                 if (curr.terminalIndex === 9) {
-                    if (rON) { reachableLocalTerminals.push(1); } else { reachableLocalTerminals.push(5); }
+                    reachableLocalTerminals.push(rON ? 1 : 5);
                 } else if (curr.terminalIndex === 1) {
                     if (rON) reachableLocalTerminals.push(9);
                 } else if (curr.terminalIndex === 5) {
@@ -116,7 +115,7 @@ function runSequenceSimulation() {
                 }
                 
                 if (curr.terminalIndex === 10) {
-                    if (rON) { reachableLocalTerminals.push(2); } else { reachableLocalTerminals.push(6); }
+                    reachableLocalTerminals.push(rON ? 2 : 6);
                 } else if (curr.terminalIndex === 2) {
                     if (rON) reachableLocalTerminals.push(10);
                 } else if (curr.terminalIndex === 6) {
@@ -124,19 +123,18 @@ function runSequenceSimulation() {
                 }
 
                 if (curr.terminalIndex === 7) {
-                    if (rON) { reachableLocalTerminals.push(3); }
+                    if (rON) reachableLocalTerminals.push(3);
                 } else if (curr.terminalIndex === 3) {
                     if (rON) reachableLocalTerminals.push(7);
                 }
 
                 if (curr.terminalIndex === 11 || curr.terminalIndex === 12 || curr.terminalIndex === 13) {
-                    currentDevice.isPowered = true;
-                    activeCoils.add(currentDevice.id);
+                    reachableLocalTerminals.push(curr.terminalIndex);
                 }
             }
             else if (currentDevice.type === 'contactor') {
                 if (loop === 0 && (curr.terminalIndex === 0 || curr.terminalIndex === 1)) totalResistance += 500;
-                let mON = previousExcitedCoils.has(currentDevice.id) || currentDevice.isPowered;
+                let mON = excitedCoils.has(currentDevice.id);
                 if (mON) {
                     if (curr.terminalIndex === 3) reachableLocalTerminals.push(8); if (curr.terminalIndex === 8) reachableLocalTerminals.push(3);
                     if (curr.terminalIndex === 4) reachableLocalTerminals.push(9); if (curr.terminalIndex === 9) reachableLocalTerminals.push(4);
@@ -146,8 +144,7 @@ function runSequenceSimulation() {
                     if (curr.terminalIndex === 6) reachableLocalTerminals.push(11); if (curr.terminalIndex === 11) reachableLocalTerminals.push(6);
                 }
                 if (curr.terminalIndex === 0 || curr.terminalIndex === 1) {
-                    currentDevice.isPowered = true;
-                    activeCoils.add(currentDevice.id);
+                    reachableLocalTerminals.push(curr.terminalIndex);
                 }
             }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(currentDevice.type)) {
@@ -172,25 +169,23 @@ function runSequenceSimulation() {
         devices.forEach(d => {
             let isPoweredThisLoop = false;
             if (d.type === 'relay') {
-                if (d.terminals[11]?.isLive || d.terminals[12]?.isLive || d.terminals[13]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals[11].isLive && d.terminals[12].isLive || d.terminals[12].isLive && d.terminals[13].isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (d.type === 'contactor') {
-                if (d.terminals[0]?.isLive || d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals[0].isLive && d.terminals[1].isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (d.type === 'contact_block') {
-                if (d.extraConfig?.isEMO && d.terminals[4]?.isLive || d.terminals[5]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
-                else if (d.isLampElement && d.terminals[0]?.isLive || d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.extraConfig?.isEMO && d.terminals[4].isLive && d.terminals[5].isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                else if (d.isLampElement && d.terminals[0].isLive && d.terminals[1].isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
-                if (d.terminals[0]?.isLive || d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals[0].isLive && d.terminals[1].isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             d.isPowered = isPoweredThisLoop;
             if (isPoweredThisLoop) {
-                activeCoils.add(d.id);
+                excitedCoils.add(d.id);
             }
         });
-
-        previousExcitedCoils = new Set(activeCoils);
     }
 
     const finalAmp = hasCompleteLoop ? (100 / Math.max(totalResistance, 1)) : 0;
