@@ -5,22 +5,29 @@ const menuContent = document.getElementById('menu-content');
 
 // 状態に応じた下部ツールの表示・非表示切り替え
 export function updateButtonStates(currentMode) {
-    viewBtn.innerText = (currentMode === "exterior") ? "🔓 中を開ける" : "🔒 トビラを閉める";
+    if (viewBtn) {
+        viewBtn.innerText = (currentMode === "exterior") ? "🔓 中を開ける" : "🔒 トビラを閉める";
+    }
     
     const isInterior = (currentMode === "interior");
-    // グループごと一気に表示・非表示を切り替える
-    extTools.style.display = isInterior ? "none" : "flex";
-    intTools.style.display = isInterior ? "flex" : "none";
+    
+    // エラー防止用の安全な表示切り替えガード
+    if (extTools) extTools.style.display = isInterior ? "none" : "flex";
+    if (intTools) intTools.style.display = isInterior ? "flex" : "none";
     
     clearRightMenu();
 }
 
 export function clearRightMenu() {
-    menuContent.innerHTML = `<p style="color: #bdc3c7; font-size: 0.9rem;">パーツを選択すると、ここに詳細な設定メニューが動的に生成されます。</p>`;
+    if (menuContent) {
+        menuContent.innerHTML = `<p style="color: #bdc3c7; font-size: 0.9rem;">パーツを選択すると、ここに詳細な設定メニューが動的に生成されます。</p>`;
+    }
 }
 
 export function showAddDeviceMenu(type, onConfirm) {
+    if (!menuContent) return;
     menuContent.innerHTML = "";
+    
     if (type === 'terminal_block') {
         menuContent.innerHTML = `
             <div class="form-group">
@@ -35,9 +42,27 @@ export function showAddDeviceMenu(type, onConfirm) {
             clearRightMenu();
         });
     }
+    else if (type === 'ext_switch') {
+        menuContent.innerHTML = `
+            <div class="form-group">
+                <label>接点構成 (裏側に生成されるブロック)</label>
+                <select id="input-contact-type">
+                    <option value="NO" selected>A接点 (NO - 青)</option>
+                    <option value="NC">B接点 (NC - 赤)</option>
+                </select>
+            </div>
+            <button class="btn" id="btn-confirm-add" style="width: 100%;">スイッチを配置 🛠️</button>
+        `;
+        document.getElementById('btn-confirm-add').addEventListener('click', () => {
+            const contactType = document.getElementById('input-contact-type').value;
+            onConfirm({ contactType: contactType });
+            clearRightMenu();
+        });
+    }
 }
 
 export function showSelectedDeviceMenu(device, onDelete) {
+    if (!menuContent) return;
     menuContent.innerHTML = `
         <div style="font-size: 0.9rem; margin-bottom: 10px;">
             <strong>機器名:</strong> ${device.name}<br>
