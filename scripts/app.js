@@ -18,8 +18,8 @@ document.getElementById('build-btn')?.addEventListener('click', () => {
     panelConfig.phase = (voltSelect.value === "AC 200V") ? "3Φ3W (三相3線)" : "1Φ2W (単相2線)";
     if (menuModal) menuModal.style.display = 'none'; if (workspace) workspace.style.display = 'flex';
     const mainPoles = (voltSelect.value === "AC 200V") ? 3 : 2;
-    const mainTerminal = new ControlDevice(Date.now(), 'terminal_block', 30, dinRails[0].y, { poles: mainPoles, isMainPower: true });
-    mainTerminal.y = (dinRails[0].y + dinRailHeight / 2) - mainTerminal.height / 2;
+    const mainTerminal = new ControlDevice(Date.now(), 'terminal_block', 30, dinRails.y, { poles: mainPoles, isMainPower: true });
+    mainTerminal.y = (dinRails.y + dinRailHeight / 2) - mainTerminal.height / 2;
     devices.push(mainTerminal); updateButtonStates(currentMode); draw();
 });
 
@@ -33,15 +33,12 @@ document.getElementById('add-rail-btn')?.addEventListener('click', () => {
     dinRails.push({ id: Date.now(), y: Math.min(canvas.height - 60, lastY + 120), height: dinRailHeight }); draw();
 });
 
-// ★トビラ用プロ機器（計器・タイマー含む）の配置バインド
 document.getElementById('add-ext-device-btn')?.addEventListener('click', () => {
     const selectType = document.getElementById('select-ext-type').value;
     showAddDeviceMenu(selectType, (config) => {
         const newDevice = new ControlDevice(Date.now(), selectType, 100, 150, config);
-        if (config.color) newDevice.color = config.color;
-        if (config.label) newDevice.label = config.label;
-        if (config.unit) newDevice.unit = config.unit;
-        if (config.timeUnit) { newDevice.timeUnit = config.timeUnit; newDevice.timerMode = config.timerMode; }
+        if (config.color) newDevice.color = config.color; if (config.label) newDevice.label = config.label;
+        if (config.unit) newDevice.unit = config.unit; if (config.timeUnit) { newDevice.timeUnit = config.timeUnit; newDevice.timerMode = config.timerMode; }
         devices.push(newDevice); draw();
     });
 });
@@ -54,23 +51,18 @@ document.getElementById('add-terminal-btn')?.addEventListener('click', () => {
     showAddDeviceMenu('terminal_block', (config) => { devices.push(new ControlDevice(Date.now(), 'terminal_block', 150, 100, config)); draw(); });
 });
 
-// ★盤内用新機器（ブレーカー・電磁接触器）の配置ボタンをイベント追加
-document.getElementById('int-tools')?.insertAdjacentHTML('beforeend', `
-    <button class="btn" id="add-breaker-btn" style="background:linear-gradient(135deg,#2c3e50,#1a252f)">+ ブレーカー</button>
-    <button class="btn" id="add-contactor-btn" style="background:linear-gradient(135deg,#7f8c8d,#57606f)">+ 電磁接触器</button>
-`);
-
-document.getElementById('add-breaker-btn')?.addEventListener('click', () => {
-    showAddDeviceMenu('breaker', (config) => {
-        const newDevice = new ControlDevice(Date.now(), 'breaker', 200, 100, config);
-        devices.push(newDevice); draw();
+if (!document.getElementById('add-breaker-btn')) {
+    document.getElementById('int-tools')?.insertAdjacentHTML('beforeend', `
+        <button class="btn" id="add-breaker-btn" style="background:linear-gradient(135deg,#2c3e50,#1a252f)">+ ブレーカー</button>
+        <button class="btn" id="add-contactor-btn" style="background:linear-gradient(135deg,#7f8c8d,#57606f)">+ 電磁接触器</button>
+    `);
+    document.getElementById('add-breaker-btn')?.addEventListener('click', () => {
+        showAddDeviceMenu('breaker', (config) => { devices.push(new ControlDevice(Date.now(), 'breaker', 200, 100, config)); draw(); });
     });
-});
-
-document.getElementById('add-contactor-btn')?.addEventListener('click', () => {
-    const newDevice = new ControlDevice(Date.now(), 'contactor', 200, 100);
-    devices.push(newDevice); draw();
-});
+    document.getElementById('add-contactor-btn')?.addEventListener('click', () => {
+        devices.push(new ControlDevice(Date.now(), 'contactor', 200, 100)); draw();
+    });
+}
 
 if (canvas) {
     canvas.addEventListener('mousedown', handleMouseDown); canvas.addEventListener('mousemove', handleMouseMove);
@@ -83,16 +75,42 @@ function draw() { if (ctx && canvas) drawAll(ctx, canvas, panelConfig, devices, 
 function handleMouseDown(e) {
     if (isAnimating) return;
     const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    
     if (currentMode === "interior") {
-        let hitTD = null, hitTI = null;
-        for (let i = devices.length - 1; i >= 0; i--) {
-            if (devices[i].layer !== "interior") continue;
-            const tIndex = devices[i].checkTerminalClick(mx, my);
-            if (tIndex !== null) { hitTD = devices[i]; hitTI = tIndex; break; }
-        }
+        // A. 現在配線中でない場合
         if (!activeWiring) {
-            if (hitTD !== null) { activeWiring = { fromNode: hitTD, fromTerminal: hitTI, currentX: mx, currentY: my, points: [] }; draw(); return; }
-        } else {
+            // ① 通常のネジ端子クリック判定
+            for (let i = devices.length - 1; i >= 0; i--) {
+                if (devices[i].layer !== "interior") continue;
+                const tIndex = devices[i].checkTerminalClick(mx, my);
+                if (tIndex !== null) {
+                    activeWiring = { fromNode: devices[i], fromTerminal: tIndex, currentX: mx, currentY: my, points: [] };
+                    draw(); return;
+                }
+            }
+            
+            // ②【新機能】配置済みの全配線の中点（折れ曲がり角）クリック判定
+            for (let w of wires) {
+                if (w.points) {
+                    for (let pt of w.points) {
+                        if (Math.hypot(mx - pt.x, my - pt.y) < 8) {
+                            // 中点クリック成功！相方の端子（fromNode）をダミーとして配線を開始
+                            activeWiring = { fromNode: w.fromNode, fromTerminal: w.fromTerminal, currentX: mx, currentY: my, points: [{ x: pt.x, y: pt.y }] };
+                            draw(); return;
+                        }
+                    }
+                }
+            }
+        } 
+        // B. すでに配線中の場合
+        else {
+            let hitTD = null, hitTI = null;
+            for (let i = devices.length - 1; i >= 0; i--) {
+                if (devices[i].layer !== "interior") continue;
+                const tIndex = devices[i].checkTerminalClick(mx, my);
+                if (tIndex !== null) { hitTD = devices[i]; hitTI = tIndex; break; }
+            }
+            
             if (hitTD !== null) {
                 if (hitTD !== activeWiring.fromNode) {
                     wires.push({ fromNode: activeWiring.fromNode, fromTerminal: activeWiring.fromTerminal, toNode: hitTD, toTerminal: hitTI, points: [...activeWiring.points], color: '#e74c3c' });
@@ -101,6 +119,7 @@ function handleMouseDown(e) {
             } else { activeWiring.points.push({ x: mx, y: my }); draw(); return; }
         }
     }
+    
     if (!activeWiring) {
         let hitDevice = null;
         for (let i = devices.length - 1; i >= 0; i--) {
