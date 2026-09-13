@@ -9,7 +9,6 @@ export class ControlDevice {
         this.initSpecs();
     }
     initSpecs() {
-        // ★【本物を完全に見た】DYF14Aソケットの「上3 / 中4 / 中4 / 下3」の14端子ピンアサイン
         if (this.type === 'relay') { 
             this.width = 55; this.height = 115; this.color = '#1e252b'; this.name = 'DYF14A SOCKET'; 
             this.terminals = [
@@ -59,7 +58,7 @@ export class ControlDevice {
         }
     }
     
-    // ★【大改修】DYF14Aソケットの「上3 / 中4 / 中4 / 下3」層の完璧な座標計算
+    // ★【修正パッチ】上から3番目の段（COM段）のY座標を中央スロットの下側（y + 74）へ安全に引き下げ！
     getTerminalCoords(index) {
         if (this.type === 'terminal_block') return { x: this.x + 25 + (Math.floor(index / 2) * 30), y: (index % 2 === 1) ? this.y + this.height - 15 : this.y + 15 };
         if (this.type === 'breaker') return { x: this.x + 17 + (Math.floor(index / 2) * 35), y: (index % 2 === 1) ? this.y + this.height - 12 : this.y + 12 };
@@ -68,22 +67,19 @@ export class ControlDevice {
         if (this.type === 'contact_block' && this.extraConfig?.isEMO) return [{ x: this.x + 10, y: this.y + 10 }, { x: this.x + 10, y: this.y + 22 }, { x: this.x + 35, y: this.y + 10 }, { x: this.x + 35, y: this.y + 22 }, { x: this.x + 22, y: this.y + 42 }, { x: this.x + 22, y: this.y + 50 }][index];
         if (this.type === 'contact_block') return { x: this.x + this.width / 2, y: (index === 0) ? this.y + 10 : this.y + this.height - 10 };
         
-        // ★【完全準拠】[上3] [中4] [中4] [下3] の4階建てマッピング
+        // ★【DYF14A実機完全再現】3層スロット幅を考慮した綺麗なY軸等間隔ステップ配置
         if (this.type === 'relay') {
-            // 4段目（一番上の段 - 3極） -> 左右を少し空けて中央に3個並ぶ
+            // 4段目（NO段 - 3極）
             if (index >= 0 && index <= 2) return { x: this.x + 16 + (index * 11.5), y: this.y + 14 };
-            
-            // 3段目（上から二段目 - 4極） -> 4個均等にギチギチ並ぶ
+            // 3段目（NC段 - 4極）
             if (index >= 3 && index <= 6) return { x: this.x + 10 + ((index - 3) * 11.5), y: this.y + 32 };
-            
-            // 2段目（下から二段目 - 4極） -> 4個均等にギチギチ並ぶ
-            if (index >= 7 && index <= 10) return { x: this.x + 10 + ((index - 7) * 11.5), y: this.y + 50 };
-            
-            // 1段目（一番下の段 - 3極） -> コイル極含む、左右を少し空けて中央に3個並ぶ
-            if (index >= 11 && index <= 13) return { x: this.x + 16 + ((index - 11) * 11.5), y: this.y + this.height - 14 };
+            // 2段目（COM段 - 4極） -> ★めり込みを解消し、中央スロットを跨いだ「y + 74」のリアルな位置へ引き下げ！
+            if (index >= 7 && index <= 10) return { x: this.x + 10 + ((index - 7) * 11.5), y: this.y + 74 };
+            // 1段目（コイル段 - 3極） -> 最下段「y + 94」に綺麗に収める
+            if (index >= 11 && index <= 13) return { x: this.x + 16 + ((index - 11) * 11.5), y: this.y + this.height - 15 };
         }
         
-        // 富士電機SC-5-1型 3層マッピング [一番上2] [上5] [下5]
+        // 富士電機SC-5-1型 3層マッピング
         if (this.type === 'contactor') {
             if (index === 0) return { x: this.x + 29, y: this.y + 12 }; if (index === 1) return { x: this.x + 56, y: this.y + 12 };
             if (index >= 2 && index <= 6) return { x: this.x + 12 + ((index - 2) * 15.2), y: this.y + 25 };
