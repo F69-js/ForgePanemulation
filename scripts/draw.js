@@ -1,4 +1,4 @@
-import { doorOpenProgress } from './ui.js';
+import { doorOpenProgress } from './logic.js';
 
 const dinRail = { y: 240, height: 40 };
 
@@ -11,7 +11,7 @@ export function drawAll(ctx, canvas, panelConfig, devices, wires, activeWiring) 
     ctx.fillStyle = rg; ctx.fillRect(0, dinRail.y, canvas.width, dinRail.height);
     ctx.strokeStyle = '#7f8c8d'; ctx.strokeRect(0, dinRail.y + 4, canvas.width, dinRail.height - 8);
     
-    // トビラが開いている度合いに合わせて内部を描画
+    // トビラの開閉プログレスに合わせて内部を描画
     if (doorOpenProgress > 0) {
         ctx.save();
         ctx.globalAlpha = doorOpenProgress;
@@ -30,7 +30,7 @@ export function drawAll(ctx, canvas, panelConfig, devices, wires, activeWiring) 
             ctx.fillStyle = doorGrad; ctx.fillRect(0, 0, doorWidth, canvas.height);
             ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(doorWidth - 10, 0, 10, canvas.height);
 
-            // 銘板
+            // 銘板の描画
             if (doorWidth > 120) {
                 ctx.save();
                 ctx.fillStyle = '#111'; ctx.fillRect(30, 40, Math.min(doorWidth - 60, canvas.width - 60), 60);
@@ -42,7 +42,7 @@ export function drawAll(ctx, canvas, panelConfig, devices, wires, activeWiring) 
                 }
                 ctx.restore();
                 
-                // ハンドル・鍵穴
+                // ハンドル・鍵穴風グラフィック
                 if (doorWidth > 40) {
                     ctx.fillStyle = '#7f8c8d'; ctx.fillRect(doorWidth - 35, canvas.height/2 - 30, 20, 60);
                     ctx.fillStyle = '#2d3436'; ctx.beginPath(); ctx.arc(doorWidth - 25, canvas.height/2, 5, 0, Math.PI*2); ctx.fill();
