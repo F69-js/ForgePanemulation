@@ -16,6 +16,7 @@ export class ControlDevice {
         } 
         else if (this.type === 'contact_block') {
             this.contactType = this.extraConfig.contactType || "NO"; this.isLampElement = this.extraConfig.isLampElement || false; this.width = 45; this.height = 55;
+            // ★新仕様：タイマー・指示調節計の裏側は10極、メーター・ブザーの裏側は2極、スイッチ類は2極
             if (this.isLampElement) { this.color = '#f1c40f'; this.name = 'ランプソケット'; this.terminals = [{ name: "X1 (+)" }, { name: "X2 (-)" }]; } 
             else { this.color = (this.contactType === "NO") ? "#2980b9" : "#e74c3c"; this.name = `${this.contactType} BLOCK`; this.terminals = [{ name: "1 (入)" }, { name: "2 (出)" }]; }
         }
@@ -34,8 +35,25 @@ export class ControlDevice {
             else if (this.type === 'panel_timer') { this.width = 72; this.height = 72; this.timeUnit = this.extraConfig.timeUnit || "sec"; this.timerMode = this.extraConfig.timerMode || "ON-Delay"; }
         }
     }
+    // ★【新仕様】裏面の機器形状が丸型（円筒）になったことに伴う、ネジ端子の正確な座標配置システム
     getTerminalCoords(index) {
         if (this.type === 'terminal_block') return { x: this.x + 25 + (Math.floor(index / 2) * 30), y: (index % 2 === 1) ? this.y + this.height - 15 : this.y + 15 };
+        
+        // ★新仕様：メーター、ブザーの裏面（2端子：左右横並び）
+        if (this.type === 'analog_meter' || this.type === 'buzzer') {
+            return index === 0 ? { x: this.x + this.width / 2 - 15, y: this.y + this.height / 2 } : { x: this.x + this.width / 2 + 15, y: this.y + this.height / 2 };
+        }
+        
+        // ★新仕様：タイマー、指示調節計の裏面（10端子：上下5個ずつの綺麗な整列）
+        if (this.type === 'panel_timer' || this.type === 'digital_controller') {
+            const isBottom = index >= 5;
+            const col = index % 5;
+            return {
+                x: this.x + 12 + (col * 12),
+                y: isBottom ? this.y + this.height - 15 : this.y + 15
+            };
+        }
+
         if (this.type === 'contact_block') return { x: this.x + this.width / 2, y: (index === 0) ? this.y + 10 : this.y + this.height - 10 };
         if (this.type === 'breaker') return { x: this.x + 17 + (Math.floor(index / 2) * 35), y: (index % 2 === 1) ? this.y + this.height - 12 : this.y + 12 };
         if (this.type === 'contactor') return [{x:this.x+15,y:this.y+12},{x:this.x+15,y:this.y+this.height-12},{x:this.x+38,y:this.y+12},{x:this.x+38,y:this.y+this.height-12},{x:this.x+60,y:this.y+12},{x:this.x+60,y:this.y+this.height-12}][index];
