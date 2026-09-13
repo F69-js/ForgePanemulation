@@ -38,18 +38,16 @@ function runSequenceSimulation() {
         }
     });
 
-    const mainPower = devices.find(d => d.type === 'terminal_block');
+    // ★【大進化の核心】ロード時にフラグが飛んでも、配列内の「最初の端子台」か、あるいは「isMainPower」を持つやつを絶対主電源のスタート王として自動強制マウント！
+    const mainPower = devices.find(d => d.type === 'terminal_block' && (d.extraConfig?.isMainPower || d.name?.includes('端子台'))) || devices.find(d => d.type === 'terminal_block');
     if (!mainPower) {
         self.postMessage({ devices: [], wires: [], totalAmp: 0 });
         return;
     }
 
-    let totalResistance = 0;
-    let hasCompleteLoop = false;
-    let excitedCoils = new Set();
-
     for (let loop = 0; loop < 8; loop++) {
         let visited = new Set(), queue = [];
+        let excitedCoils = new Set();
         
         queue.push({ deviceId: mainPower.id, terminalIndex: 0 });
         queue.push({ deviceId: mainPower.id, terminalIndex: 2 });
@@ -92,7 +90,6 @@ function runSequenceSimulation() {
                     if (canPass && loop === 0) totalResistance += 1;
                 }
             }
-            // ★大改修：C接点の先読み電位差チェックを最適化し、NO/NCが確実に背反開閉するよう設計！
             else if (currentDevice.type === 'relay') {
                 if (loop === 0 && (curr.terminalIndex === 12 || curr.terminalIndex === 13)) totalResistance += 1200;
                 
@@ -123,7 +120,7 @@ function runSequenceSimulation() {
                 }
 
                 if (curr.terminalIndex === 7) {
-                    if (rON) reachableLocalTerminals.push(3);
+                    if (rON) { reachableLocalTerminals.push(3); }
                 } else if (curr.terminalIndex === 3) {
                     if (rON) reachableLocalTerminals.push(7);
                 }
@@ -169,17 +166,17 @@ function runSequenceSimulation() {
         devices.forEach(d => {
             let isPoweredThisLoop = false;
             if (d.type === 'relay') {
-                if (d.terminals[11].isLive && d.terminals[12].isLive || d.terminals[12].isLive && d.terminals[13].isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals[11]?.isLive && d.terminals[12]?.isLive || d.terminals[12]?.isLive && d.terminals[13]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (d.type === 'contactor') {
-                if (d.terminals[0].isLive && d.terminals[1].isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (d.type === 'contact_block') {
-                if (d.extraConfig?.isEMO && d.terminals[4].isLive && d.terminals[5].isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
-                else if (d.isLampElement && d.terminals[0].isLive && d.terminals[1].isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.extraConfig?.isEMO && d.terminals[2]?.isLive && d.terminals[3]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                else if (d.isLampElement && d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
-                if (d.terminals[0].isLive && d.terminals[1].isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             d.isPowered = isPoweredThisLoop;
             if (isPoweredThisLoop) {
