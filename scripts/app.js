@@ -3,12 +3,13 @@ import { updateButtonStates, showAddDeviceMenu, showSelectedDeviceMenu, clearRig
 import { drawAll } from './draw.js';
 import { ControlDevice } from './classes/device.js';
 
+// 各画面要素を即座に取得（type="module"なので直下で安全に取得可能）
 const startScreen = document.getElementById('start-screen');
 const menuModal = document.getElementById('menu-modal');
 const workspace = document.getElementById('workspace');
-
 const canvas = document.getElementById('panelCanvas');
 const ctx = canvas.getContext('2d');
+
 let panelConfig = { name: "", phase: "" };
 let devices = [];
 let wires = [];
@@ -21,104 +22,103 @@ let hoveredTerminal = null;
 const dinRailY = 240;
 const dinRailHeight = 40;
 
-window.addEventListener('DOMContentLoaded', () => {
-    // 1. 新規設計ボタン
-    const createBtn = document.getElementById('create-btn');
-    if (createBtn) {
-        createBtn.addEventListener('click', () => {
-            if (startScreen) startScreen.style.display = 'none';
-            if (menuModal) menuModal.style.display = 'block';
+// --- 【修正】イベントリスナーを即時登録し、発火漏れを根絶する ---
+
+// 1. 新規設計ボタン
+const createBtn = document.getElementById('create-btn');
+if (createBtn) {
+    createBtn.addEventListener('click', () => {
+        if (startScreen) startScreen.style.display = 'none';
+        if (menuModal) menuModal.style.display = 'block';
+    });
+}
+
+// 2. 盤を製造するボタン
+const buildBtn = document.getElementById('build-btn');
+if (buildBtn) {
+    buildBtn.addEventListener('click', () => {
+        panelConfig.name = document.getElementById('panel-name').value.toUpperCase();
+        const voltSelect = document.getElementById('panel-voltage');
+        panelConfig.phase = (voltSelect.value === "AC 200V") ? "3Φ3W (三相3線)" : "1Φ2W (単相2線)";
+        
+        if (menuModal) menuModal.style.display = 'none';
+        if (workspace) workspace.style.display = 'flex';
+
+        // 初期メイン端子台の自動生成
+        const mainPoles = (voltSelect.value === "AC 200V") ? 3 : 2;
+        const mainTerminal = new ControlDevice(Date.now(), 'terminal_block', 30, dinRailY, {
+            poles: mainPoles,
+            isMainPower: true
         });
-    }
+        mainTerminal.y = (dinRailY + dinRailHeight / 2) - mainTerminal.height / 2;
+        devices.push(mainTerminal);
 
-    // 2. 盤を製造するボタン
-    const buildBtn = document.getElementById('build-btn');
-    if (buildBtn) {
-        buildBtn.addEventListener('click', () => {
-            panelConfig.name = document.getElementById('panel-name').value.toUpperCase();
-            const voltSelect = document.getElementById('panel-voltage');
-            panelConfig.phase = (voltSelect.value === "AC 200V") ? "3Φ3W (三相3線)" : "1Φ2W (単相2線)";
-            
-            if (menuModal) menuModal.style.display = 'none';
-            if (workspace) workspace.style.display = 'flex';
+        updateButtonStates(currentMode);
+        draw();
+    });
+}
 
-            // 初期メイン端子台の自動生成
-            const mainPoles = (voltSelect.value === "AC 200V") ? 3 : 2;
-            const mainTerminal = new ControlDevice(Date.now(), 'terminal_block', 30, dinRailY, {
-                poles: mainPoles,
-                isMainPower: true
-            });
-            mainTerminal.y = (dinRailY + dinRailHeight / 2) - mainTerminal.height / 2;
-            devices.push(mainTerminal);
-
+// 3. 中を開ける / トビラを閉める ボタン
+const viewBtn = document.getElementById('view-btn');
+if (viewBtn) {
+    viewBtn.addEventListener('click', () => {
+        if (toggleDoorMode(devices)) {
             updateButtonStates(currentMode);
-            draw();
-        });
-    }
+            animateLoop();
+        }
+    });
+}
 
-    // 3. 中を開ける / トビラを閉める ボタン
-    const viewBtn = document.getElementById('view-btn');
-    if (viewBtn) {
-        viewBtn.addEventListener('click', () => {
-            if (toggleDoorMode(devices)) {
-                updateButtonStates(currentMode);
-                animateLoop();
-            }
-        });
-    }
-
-    // 4. 【完全修正】トビラ機器を追加ボタン (セレクトボックス連動)
-    const addExtBtn = document.getElementById('add-ext-device-btn');
-    if (addExtBtn) {
-        addExtBtn.addEventListener('click', () => {
-            const selectType = document.getElementById('select-ext-type').value;
-            
-            // 裏側にA接点/B接点の選択が必要なスイッチ系デバイスの場合
-            if (['switch', 'lamp_switch'].includes(selectType)) {
-                showAddDeviceMenu('ext_switch', (config) => {
-                    const newDevice = new ControlDevice(Date.now(), selectType, 100, 150, config);
-                    devices.push(newDevice);
-                    draw();
-                });
-            } else {
-                // ランプやブザー、キーSWなど、設定不要で即時配置できるデバイスの場合
-                const newDevice = new ControlDevice(Date.now(), selectType, 100, 150);
+// 4. トビラ機器を追加ボタン
+const addExtBtn = document.getElementById('add-ext-device-btn');
+if (addExtBtn) {
+    addExtBtn.addEventListener('click', () => {
+        const selectType = document.getElementById('select-ext-type').value;
+        
+        if (['switch', 'lamp_switch'].includes(selectType)) {
+            showAddDeviceMenu('ext_switch', (config) => {
+                const newDevice = new ControlDevice(Date.now(), selectType, 100, 150, config);
                 devices.push(newDevice);
                 draw();
-            }
-        });
-    }
+            });
+        } else {
+            const newDevice = new ControlDevice(Date.now(), selectType, 100, 150);
+            devices.push(newDevice);
+            draw();
+        }
+    });
+}
 
-    // 5. リレーを追加ボタン
-    const addRelayBtn = document.getElementById('add-relay-btn');
-    if (addRelayBtn) {
-        addRelayBtn.addEventListener('click', () => {
-            const newDevice = new ControlDevice(Date.now(), 'relay', 150, 100);
+// 5. リレーを追加ボタン
+const addRelayBtn = document.getElementById('add-relay-btn');
+if (addRelayBtn) {
+    addRelayBtn.addEventListener('click', () => {
+        const newDevice = new ControlDevice(Date.now(), 'relay', 150, 100);
+        devices.push(newDevice);
+        draw();
+    });
+}
+
+// 6. 可変端子台を追加ボタン
+const addTerminalBtn = document.getElementById('add-terminal-btn');
+if (addTerminalBtn) {
+    addTerminalBtn.addEventListener('click', () => {
+        showAddDeviceMenu('terminal_block', (config) => {
+            const newDevice = new ControlDevice(Date.now(), 'terminal_block', 150, 100, config);
             devices.push(newDevice);
             draw();
         });
-    }
+    });
+}
 
-    // 6. 可変端子台を追加ボタン
-    const addTerminalBtn = document.getElementById('add-terminal-btn');
-    if (addTerminalBtn) {
-        addTerminalBtn.addEventListener('click', () => {
-            showAddDeviceMenu('terminal_block', (config) => {
-                const newDevice = new ControlDevice(Date.now(), 'terminal_block', 150, 100, config);
-                devices.push(newDevice);
-                draw();
-            });
-        });
-    }
+// 7. Canvasマウスイベントバインド
+if (canvas) {
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseup', handleMouseUp);
+}
 
-    // 7. Canvasマウスイベントバインド
-    if (canvas) {
-        canvas.addEventListener('mousedown', handleMouseDown);
-        canvas.addEventListener('mousemove', handleMouseMove);
-        canvas.addEventListener('mouseup', handleMouseUp);
-    }
-});
-
+// --- ループ・描画・マウス操作ロジック群 ---
 function animateLoop() {
     const continuing = updateDoorProgress(); draw();
     if (continuing) requestAnimationFrame(animateLoop);
@@ -177,7 +177,6 @@ function handleMouseMove(e) {
         }
         draggedDevice.x = tx; draggedDevice.y = ty;
         
-        // 移動時に双方向の表裏位置をリアルタイム完全同期
         syncDevicePositions(draggedDevice, devices);
         
         draw(); return;
