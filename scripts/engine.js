@@ -23,7 +23,7 @@ function resetAllStates() {
             d.terminals.forEach(t => { t.isLive = false; t.isGnd = false; });
         }
     });
-    self.postMessage({ devices: [], wires: [], totalAmp: 0 });
+    self.postMessage({ devices: [], wires: [], brokenPins: [], totalAmp: 0 });
 }
 
 function isTerminalLive(deviceId, tIdx) {
@@ -135,7 +135,7 @@ function run電位走査(mainPower, startIndex, keyProp) {
 function runSequenceSimulation() {
     const mainPower = devices.find(d => d.type === 'terminal_block' && (d.extraConfig?.isMainPower || d.name?.includes('端子台'))) || devices.find(d => d.type === 'terminal_block');
     if (!mainPower) {
-        self.postMessage({ devices: [], wires: [], totalAmp: 0 });
+        self.postMessage({ devices: [], wires: [], brokenPins: [], totalAmp: 0 });
         return;
     }
 
@@ -152,24 +152,47 @@ function runSequenceSimulation() {
         devices.forEach(d => {
             let isPoweredThisLoop = false;
             if (d.type === 'relay') {
-                if ((d.terminals[11]?.isLive && d.terminals[12]?.isGnd) || (d.terminals[12]?.isLive && d.terminals[11]?.isGnd) || (d.terminals[11]?.isLive && d.terminals[13]?.isGnd) || (d.terminals[13]?.isLive && d.terminals[11]?.isGnd)) { isPoweredThisLoop = true; }
+                if ((d.terminals[11]?.isLive && d.terminals[11]?.isGnd) || (d.terminals[12]?.isLive && d.terminals[12]?.isGnd) || (d.terminals[13]?.isLive && d.terminals[13]?.isGnd)) { isPoweredThisLoop = true; }
             }
             else if (d.type === 'contactor') {
-                if ((d.terminals[0]?.isLive && d.terminals[1]?.isGnd) || (d.terminals[1]?.isLive && d.terminals[0]?.isGnd)) { isPoweredThisLoop = true; }
+                if ((d.terminals[0]?.isLive && d.terminals[0]?.isGnd) || (d.terminals[1]?.isLive && d.terminals[1]?.isGnd)) { isPoweredThisLoop = true; }
             }
             else if (d.type === 'contact_block') {
                 if (d.extraConfig?.isEMO) {
-                    if ((d.terminals[4]?.isLive && d.terminals[5]?.isGnd) || (d.terminals[5]?.isLive && d.terminals[4]?.isGnd)) isPoweredThisLoop = true;
+                    if ((d.terminals[4]?.isLive && d.terminals[4]?.isGnd) || (d.terminals[5]?.isLive && d.terminals[5]?.isGnd)) isPoweredThisLoop = true;
                 } else if (d.isLampElement) {
-                    if ((d.terminals[0]?.isLive && d.terminals[1]?.isGnd) || (d.terminals[1]?.isLive && d.terminals[0]?.isGnd)) isPoweredThisLoop = true;
+                    if ((d.terminals[0]?.isLive && d.terminals[0]?.isGnd) || (d.terminals[1]?.isLive && d.terminals[1]?.isGnd)) isPoweredThisLoop = true;
                 }
             }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
-                if ((d.terminals[0]?.isLive && d.terminals[1]?.isGnd) || (d.terminals[1]?.isLive && d.terminals[0]?.isGnd)) { isPoweredThisLoop = true; }
+                if ((d.terminals[0]?.isLive && d.terminals[0]?.isGnd) || (d.terminals[1]?.isLive && d.terminals[1]?.isGnd)) { isPoweredThisLoop = true; }
             }
             d.isPowered = isPoweredThisLoop;
         });
     }
+
+    let brokenPins = [];
+    devices.forEach(d => {
+        if (d.terminals) {
+            d.terminals.forEach((t, idx) => {
+                if (t.isLive && !t.isGnd) {
+                    let opposingIdx = -1;
+                    if (d.type === 'terminal_block' || d.type === 'breaker') {
+                        opposingIdx = idx % 2 === 0 ? idx + 1 : idx - 1;
+                    } else if (d.type === 'contact_block' && !d.isLampElement) {
+                        opposingIdx = idx === 0 ? 1 : 0;
+                    } else if (d.type === 'relay') {
+                        if (idx === 8) opposingIdx = 4;
+                        if (idx === 9) opposingIdx = 5;
+                        if (idx === 10) opposingIdx = 6;
+                    }
+                    if (opposingIdx !== -1 && d.terminals[opposingIdx] && !d.terminals[opposingIdx].isLive) {
+                        brokenPins.push({ deviceId: d.id, terminalIndex: idx });
+                    }
+                }
+            });
+        }
+    });
 
     let finalActiveLoads = 0;
     devices.forEach(d => {
@@ -182,8 +205,4 @@ function runSequenceSimulation() {
     const finalAmp = 0.062 * finalActiveLoads;
 
     self.postMessage({
-        devices: devices.map(d => ({ id: d.id, isON: d.isON, currentPosIndex: d.currentPosIndex, isPowered: d.isPowered })),
-        wires: wires.map((w, idx) => ({ index: idx, isLive: isTerminalLive(w.fromNode.id, w.fromTerminal) })),
-        totalAmp: finalAmp
-    });
-}
+devices: devices.map(d => ({ id: d.id, isON: d.isON, currentPosIndex: d.currentPosIndex, isPowered: d.isPowered })),wires: wires.map((w, idx) => ({ index: idx, isLive: isTerminalLive(w.fromNode.id, w.fromTerminal) })),brokenPins: brokenPins,totalAmp: finalAmp});} 
