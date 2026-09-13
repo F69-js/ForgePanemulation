@@ -38,16 +38,18 @@ function runSequenceSimulation() {
         }
     });
 
-    // ★【大進化の核心】ロード時にフラグが飛んでも、配列内の「最初の端子台」か、あるいは「isMainPower」を持つやつを絶対主電源のスタート王として自動強制マウント！
     const mainPower = devices.find(d => d.type === 'terminal_block' && (d.extraConfig?.isMainPower || d.name?.includes('端子台'))) || devices.find(d => d.type === 'terminal_block');
     if (!mainPower) {
         self.postMessage({ devices: [], wires: [], totalAmp: 0 });
         return;
     }
 
+    let hasCompleteLoop = false;
+    let excitedCoils = new Set();
+    let loadCount = 0;
+
     for (let loop = 0; loop < 8; loop++) {
         let visited = new Set(), queue = [];
-        let excitedCoils = new Set();
         
         queue.push({ deviceId: mainPower.id, terminalIndex: 0 });
         queue.push({ deviceId: mainPower.id, terminalIndex: 2 });
@@ -70,7 +72,6 @@ function runSequenceSimulation() {
             if (currentDevice.type === 'terminal_block' || (currentDevice.type === 'breaker' && currentDevice.isON)) {
                 let pair = curr.terminalIndex % 2 === 0 ? curr.terminalIndex + 1 : curr.terminalIndex - 1;
                 reachableLocalTerminals.push(pair);
-                if (loop === 0) totalResistance += 1;
             } 
             else if (currentDevice.type === 'contact_block') {
                 let parentButton = devices.find(d => d.id === currentDevice.linkedDeviceId);
@@ -79,19 +80,18 @@ function runSequenceSimulation() {
                 if (currentDevice.extraConfig?.isEMO) {
                     if (curr.terminalIndex === 0 || curr.terminalIndex === 1) { if(isPressed) reachableLocalTerminals.push(curr.terminalIndex === 0 ? 1 : 0); }
                     else if (curr.terminalIndex === 2 || curr.terminalIndex === 3) { if(!isPressed) reachableLocalTerminals.push(curr.terminalIndex === 2 ? 3 : 2); }
-                    else if (curr.terminalIndex === 4 || curr.terminalIndex === 5) { 
-                        if (loop === 0) totalResistance += 800;
+                    else if (curr.terminalIndex === 4 || curr.terminalIndex === 5) {
+                        if (loop === 0) loadCount++;
                     }
                 } else if (currentDevice.isLampElement) {
-                    if (loop === 0) totalResistance += 800;
+                    if (loop === 0) loadCount++;
                 } else {
                     let canPass = (currentDevice.contactType === "NO" && isPressed) || (currentDevice.contactType === "NC" && !isPressed);
                     if (canPass) reachableLocalTerminals.push(curr.terminalIndex === 0 ? 1 : 0);
-                    if (canPass && loop === 0) totalResistance += 1;
                 }
             }
             else if (currentDevice.type === 'relay') {
-                if (loop === 0 && (curr.terminalIndex === 12 || curr.terminalIndex === 13)) totalResistance += 1200;
+                if (loop === 0 && (curr.terminalIndex === 12 || curr.terminalIndex === 13)) loadCount++;
                 
                 let rON = excitedCoils.has(currentDevice.id);
                 
@@ -120,7 +120,7 @@ function runSequenceSimulation() {
                 }
 
                 if (curr.terminalIndex === 7) {
-                    if (rON) { reachableLocalTerminals.push(3); }
+                    if (rON) reachableLocalTerminals.push(3);
                 } else if (curr.terminalIndex === 3) {
                     if (rON) reachableLocalTerminals.push(7);
                 }
@@ -130,7 +130,7 @@ function runSequenceSimulation() {
                 }
             }
             else if (currentDevice.type === 'contactor') {
-                if (loop === 0 && (curr.terminalIndex === 0 || curr.terminalIndex === 1)) totalResistance += 500;
+                if (loop === 0 && (curr.terminalIndex === 0 || curr.terminalIndex === 1)) loadCount++;
                 let mON = excitedCoils.has(currentDevice.id);
                 if (mON) {
                     if (curr.terminalIndex === 3) reachableLocalTerminals.push(8); if (curr.terminalIndex === 8) reachableLocalTerminals.push(3);
@@ -145,7 +145,7 @@ function runSequenceSimulation() {
                 }
             }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(currentDevice.type)) {
-                if (loop === 0) totalResistance += 1000;
+                if (loop === 0) loadCount++;
             }
 
             reachableLocalTerminals.forEach(tIdx => {
@@ -166,13 +166,13 @@ function runSequenceSimulation() {
         devices.forEach(d => {
             let isPoweredThisLoop = false;
             if (d.type === 'relay') {
-                if (d.terminals[11]?.isLive && d.terminals[12]?.isLive || d.terminals[12]?.isLive && d.terminals[13]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.terminals[12]?.isLive && d.terminals[13]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (d.type === 'contactor') {
                 if (d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (d.type === 'contact_block') {
-                if (d.extraConfig?.isEMO && d.terminals[2]?.isLive && d.terminals[3]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
+                if (d.extraConfig?.isEMO && d.terminals[4]?.isLive && d.terminals[5]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
                 else if (d.isLampElement && d.terminals[0]?.isLive && d.terminals[1]?.isLive) { isPoweredThisLoop = true; hasCompleteLoop = true; }
             }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
@@ -185,7 +185,7 @@ function runSequenceSimulation() {
         });
     }
 
-    const finalAmp = hasCompleteLoop ? (100 / Math.max(totalResistance, 1)) : 0;
+    const finalAmp = hasCompleteLoop ? (0.062 * Math.max(loadCount, 1)) : 0;
 
     self.postMessage({
         devices: devices.map(d => ({ id: d.id, isON: d.isON, currentPosIndex: d.currentPosIndex, isPowered: d.isPowered })),
