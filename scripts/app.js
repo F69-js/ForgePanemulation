@@ -92,7 +92,6 @@ if (!document.getElementById('add-breaker-btn')) {
 }
 
 document.getElementById('save-btn')?.addEventListener('click', () => savePanelToFile(context));
-// ★大改修：ロードした瞬間に、壊れた配線の参照オブジェクトを「新インスタンス」へ完全結びつけ再構築！
 document.getElementById('load-btn')?.addEventListener('click', async () => {
     await loadPanelFromFile(context, ControlDevice, draw, pushToEngine);
     context.wires.forEach(w => {
