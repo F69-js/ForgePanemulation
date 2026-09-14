@@ -3,8 +3,10 @@ export class ControlDevice {
         this.id = id; this.type = type; this.x = x; this.y = y; this.extraConfig = extraConfig;
         const extTypes = ['switch', 'pilot_lamp', 'selector_sw', 'lamp_switch', 'lamp_selector', 'key_switch', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer', 'emergency_stop'];
         this.layer = extTypes.includes(type) ? 'exterior' : 'interior';
+        if (extraConfig.linkedDeviceId && type !== 'contact_block') {
+            this.layer = 'interior';
+        }
         this.linkedDeviceId = extraConfig.linkedDeviceId || null; this.hasLinkedBlock = false; 
-        
         this.isON = false; this.positions = extraConfig.positions || 2; this.currentPosIndex = 0;
         this.initSpecs();
     }
@@ -44,7 +46,7 @@ export class ControlDevice {
             ]; 
         }
         else {
-            this.width = 60; this.height = 60; this.terminals = [];
+            this.width = 60; this.height = 60; this.terminals = [{ name: "1 (入力)" }, { name: "2 (出力)" }];
             const specs = {
                 switch: [0, '#2ecc71', 'START'], lamp_switch: [1, '#3498db', 'RUN'], pilot_lamp: [2, '#e74c3c', 'FAULT'],
                 selector_sw: [3, '#2c3e50', 'MANU/AUTO'], lamp_selector: [4, '#2c3e50', 'MODE'], key_switch: [5, '#2c3e50', 'LOCK'],
@@ -53,13 +55,11 @@ export class ControlDevice {
             const s = specs[this.type] || [0, '#2ecc71', 'SPARE']; 
             this.typeIndex = s[0]; this.color = s[1]; this.name = this.type.toUpperCase(); 
             if(!this.extraConfig.label) this.label = s[2];
-            
             if (this.type === 'analog_meter') { this.width = 80; this.height = 80; this.unit = this.extraConfig.unit || "A"; }
             else if (this.type === 'digital_controller') { this.width = 72; this.height = 72; this.unit = this.extraConfig.unit || "℃"; }
             else if (this.type === 'panel_timer') { this.width = 72; this.height = 72; this.timeUnit = this.extraConfig.timeUnit || "sec"; this.timerMode = this.extraConfig.timerMode || "ON-Delay"; }
         }
     }
-    
     getTerminalCoords(index) {
         if (this.type === 'terminal_block') {
             const poleIdx = Math.floor(index / 2);
@@ -67,24 +67,24 @@ export class ControlDevice {
             return { x: this.x + 25 + (poleIdx * 30), y: isBottom ? this.y + this.height - 15 : this.y + 15 };
         }
         if (this.type === 'breaker') return { x: this.x + 17 + (Math.floor(index / 2) * 35), y: (index % 2 === 1) ? this.y + this.height - 12 : this.y + 12 };
-        if (this.type === 'analog_meter' || this.type === 'buzzer') return index === 0 ? { x: this.x + this.width / 2 - 15, y: this.y + this.height / 2 } : { x: this.x + this.width / 2 + 15, y: this.y + this.height / 2 };
-        if (this.type === 'panel_timer' || this.type === 'digital_controller') return { x: this.x + 12 + ((index % 5) * 12), y: (index >= 5) ? this.y + this.height - 15 : this.y + 15 };
+        if (this.type === 'analog_meter' || this.type === 'buzzer' || this.type === 'panel_timer' || this.type === 'digital_controller' || this.type === 'pilot_lamp' || this.type === 'lamp_switch' || this.type === 'lamp_selector') {
+            if (this.layer === 'interior') {
+                return (index === 0) ? { x: this.x + 15, y: this.y + this.height / 2 } : { x: this.x + this.width - 15, y: this.y + this.height / 2 };
+            }
+        }
         if (this.type === 'contact_block' && this.extraConfig?.isEMO) return [{ x: this.x + 10, y: this.y + 10 }, { x: this.x + 10, y: this.y + 22 }, { x: this.x + 35, y: this.y + 10 }, { x: this.x + 35, y: this.y + 22 }, { x: this.x + 22, y: this.y + 42 }, { x: this.x + 22, y: this.y + 50 }][index];
         if (this.type === 'contact_block') return { x: this.x + this.width / 2, y: (index === 0) ? this.y + 10 : this.y + this.height - 10 };
-        
         if (this.type === 'relay') {
             if (index >= 0 && index <= 2) return { x: this.x + 16 + (index * 11.5), y: this.y + 14 };
             if (index >= 3 && index <= 6) return { x: this.x + 10 + ((index - 3) * 11.5), y: this.y + 32 };
             if (index >= 7 && index <= 10) return { x: this.x + 10 + ((index - 7) * 11.5), y: this.y + 74 };
             if (index >= 11 && index <= 13) return { x: this.x + 16 + ((index - 11) * 11.5), y: this.y + this.height - 15 };
         }
-        
         if (this.type === 'contactor') {
             if (index === 0) return { x: this.x + 29, y: this.y + 12 }; if (index === 1) return { x: this.x + 56, y: this.y + 12 };
             if (index >= 2 && index <= 6) return { x: this.x + 12 + ((index - 2) * 15.2), y: this.y + 25 };
             if (index >= 7 && index <= 11) return { x: this.x + 12 + ((index - 7) * 15.2), y: this.y + this.height - 12 };
         }
-        // ★タイポ完全修正：未定義の「h」を検知されない安全な固定式へ修復！
         return [{ x: this.x + 15, y: this.y + 8 }, { x: this.x + this.width - 15, y: this.y + 8 }, { x: this.x + 15, y: this.y + this.height - 8 }, { x: this.x + this.width - 15, y: this.y + this.height - 8 }][index];
     }
     checkTerminalClick(mx, my) {
