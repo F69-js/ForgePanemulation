@@ -96,12 +96,20 @@ document.getElementById('add-ext-device-btn')?.addEventListener('click', () => {
         if (config.color) newDevice.color = config.color; if (config.label) newDevice.label = config.label;
         if (config.unit) newDevice.unit = config.unit; if (config.positions) newDevice.positions = Number(config.positions) || 2;
         if (config.timeUnit) { newDevice.timeUnit = config.timeUnit; newDevice.timerMode = config.timerMode; }
+        
         const intBlockId = Date.now() + Math.random();
+        const isSwitch = ['switch', 'selector_sw', 'key_switch'].includes(selectType);
         const isLamp = ['pilot_lamp', 'lamp_switch', 'lamp_selector'].includes(selectType);
         const isEMO = (selectType === 'emergency_stop');
-        const intBlock = new ControlDevice(intBlockId, "contact_block", 100, 150, {
+        
+        // ★【バグ完全修正】スイッチ類以外（メーターやタイマー本体等）は裏面にも「本物の同一負荷タイプ」を生成！
+        const backType = isSwitch ? "contact_block" : selectType;
+        const intBlock = new ControlDevice(intBlockId, backType, 100, 150, {
             linkedDeviceId: newDevice.id, contactType: config.contactType || "NO", isLampElement: isLamp, isEMO: isEMO
         });
+        if (config.unit) intBlock.unit = config.unit;
+        if (config.timeUnit) { intBlock.timeUnit = config.timeUnit; intBlock.timerMode = config.timerMode; }
+        
         newDevice.linkedDeviceId = intBlock.id; newDevice.hasLinkedBlock = true;
         context.devices.push(newDevice, intBlock); pushToEngine(); draw();
     });
@@ -142,4 +150,4 @@ function animateLoop() {
     draw(); 
     requestAnimationFrame(animateLoop); 
 }
-function draw() { if (ctx && canvas) drawAll(ctx, canvas, context.panelConfig, context.devices, context.wires, context.activeWiring, context.hoveredTerminal, context.dinRails); }
+function draw() { if (ctx && canvas) drawAll(ctx, canvas, context.panelConfig, context.devices, context.wires, context.activeWiring, context.hoveredTerminal, context.dinRails, context.totalAmp); }
