@@ -120,14 +120,8 @@ function run電位走査(mainPower, startIndex, keyProp) {
             reachableLocalTerminals.push(pair);
         }
         else if (currentDevice.type === 'analog_meter') {
-            const meterUnit = currentDevice.unit || "A";
-            if (meterUnit === "A") {
-                let pair = curr.terminalIndex === 0 ? 1 : 0;
-                reachableLocalTerminals.push(pair);
-            } else if (meterUnit === "V" || meterUnit === "W") {
-                let pair = curr.terminalIndex === 0 ? 1 : 0;
-                reachableLocalTerminals.push(pair);
-            }
+            let pair = curr.terminalIndex === 0 ? 1 : 0;
+            reachableLocalTerminals.push(pair);
         }
 
         reachableLocalTerminals.forEach(tIdx => {
@@ -166,28 +160,20 @@ function runSequenceSimulation() {
         devices.forEach(d => {
             let isPoweredThisLoop = false;
             if (d.type === 'relay') {
-                if ((d.terminals[12]?.isLive && d.terminals[12]?.isGnd) || (d.terminals[13]?.isLive && d.terminals[13]?.isGnd)) { isPoweredThisLoop = true; }
+                if ((d.terminals && d.terminals[12]?.isLive && d.terminals[12]?.isGnd) || (d.terminals && d.terminals[13]?.isLive && d.terminals[13]?.isGnd)) { isPoweredThisLoop = true; }
             }
             else if (d.type === 'contactor') {
-                if ((d.terminals[0]?.isLive && d.terminals[0]?.isGnd) || (d.terminals[1]?.isLive && d.terminals[1]?.isGnd)) { isPoweredThisLoop = true; }
+                if ((d.terminals && d.terminals[0]?.isLive && d.terminals[0]?.isGnd) || (d.terminals && d.terminals[1]?.isLive && d.terminals[1]?.isGnd)) { isPoweredThisLoop = true; }
             }
             else if (d.type === 'contact_block') {
                 if (d.extraConfig?.isEMO) {
-                    if ((d.terminals[4]?.isLive && d.terminals[4]?.isGnd) || (d.terminals[5]?.isLive && d.terminals[5]?.isGnd)) isPoweredThisLoop = true;
+                    if ((d.terminals && d.terminals[4]?.isLive && d.terminals[4]?.isGnd) || (d.terminals && d.terminals[5]?.isLive && d.terminals[5]?.isGnd)) isPoweredThisLoop = true;
                 } else if (d.isLampElement) {
-                    if ((d.terminals[0]?.isLive && d.terminals[0]?.isGnd) || (d.terminals[1]?.isLive && d.terminals[1]?.isGnd)) isPoweredThisLoop = true;
+                    if ((d.terminals && d.terminals[0]?.isLive && d.terminals[0]?.isGnd) || (d.terminals && d.terminals[1]?.isLive && d.terminals[1]?.isGnd)) isPoweredThisLoop = true;
                 }
             }
-            else if (['pilot_lamp', 'buzzer', 'digital_controller', 'panel_timer'].includes(d.type)) {
-                if ((d.terminals[0]?.isLive && d.terminals[0]?.isGnd) || (d.terminals[1]?.isLive && d.terminals[1]?.isGnd)) { isPoweredThisLoop = true; }
-            }
-            else if (d.type === 'analog_meter') {
-                const meterUnit = d.unit || "A";
-                if (meterUnit === "V" || meterUnit === "W") {
-                    if ((d.terminals[0]?.isLive && d.terminals[0]?.isGnd) || (d.terminals[1]?.isLive && d.terminals[1]?.isGnd)) { isPoweredThisLoop = true; }
-                } else if (meterUnit === "A") {
-                    if ((d.terminals[0]?.isLive && d.terminals[1]?.isGnd) || (d.terminals[1]?.isLive && d.terminals[0]?.isGnd)) { isPoweredThisLoop = true; }
-                }
+            else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
+                if ((d.terminals && d.terminals[0]?.isLive && d.terminals[0]?.isGnd) || (d.terminals && d.terminals[1]?.isLive && d.terminals[1]?.isGnd)) { isPoweredThisLoop = true; }
             }
             d.isPowered = isPoweredThisLoop;
         });
@@ -199,4 +185,15 @@ function runSequenceSimulation() {
             d.terminals.forEach((t, idx) => {
                 if (t.isLive && !t.isGnd) {
                     let opposingIdx = -1;
-if (d.type === 'terminal_block' || d.type === 'breaker') {opposingIdx = idx % 2 === 0 ? idx + 1 : idx - 1;} else if (d.type === 'contact_block' && !d.isLampElement) {opposingIdx = idx === 0 ? 1 : 0;} else if (d.type === 'relay') {if (idx === 8) opposingIdx = 4;if (idx === 9) opposingIdx = 5;if (idx === 10) opposingIdx = 6;} else if (['pilot_lamp', 'buzzer', 'digital_controller', 'panel_timer'].includes(d.type)) {opposingIdx = idx === 0 ? 1 : 0;} else if (d.type === 'analog_meter') {opposingIdx = idx === 0 ? 1 : 0;}if (opposingIdx !== -1 && d.terminals[opposingIdx] && !d.terminals[opposingIdx].isLive) {brokenPins.push({ deviceId: d.id, terminalIndex: idx });}}});}});let finalActiveLoads = 0;devices.forEach(d => {if (d.isPowered) {if (d.type === 'relay' || d.type === 'contactor' || d.isLampElement || ['pilot_lamp', 'buzzer', 'digital_controller', 'panel_timer'].includes(d.type)) {finalActiveLoads++;}}});const finalAmp = 0.062 * finalActiveLoads;self.postMessage({devices: devices.map(d => ({ id: d.id, isON: d.isON, currentPosIndex: d.currentPosIndex, isPowered: d.isPowered })),wires: wires.map((w, idx) => ({ index: idx, isLive: isTerminalLive(w.fromNode.id, w.fromTerminal) })),brokenPins: brokenPins,totalAmp: finalAmp});}
+                    if (d.type === 'terminal_block' || d.type === 'breaker') {
+                        opposingIdx = idx % 2 === 0 ? idx + 1 : idx - 1;
+                    } else if (d.type === 'contact_block' && !d.isLampElement) {
+                        opposingIdx = idx === 0 ? 1 : 0;
+                    } else if (d.type === 'relay') {
+                        if (idx === 8) opposingIdx = 4;
+                        if (idx === 9) opposingIdx = 5;
+                        if (idx === 10) opposingIdx = 6;
+                    } else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
+                        opposingIdx = idx === 0 ? 1 : 0;
+                    }
+if (opposingIdx !== -1 && d.terminals[opposingIdx] && !d.terminals[opposingIdx].isLive) {brokenPins.push({ deviceId: d.id, terminalIndex: idx });}}});}});let finalActiveLoads = 0;devices.forEach(d => {if (d.isPowered) {if (d.type === 'relay' || d.type === 'contactor' || d.isLampElement || ['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {finalActiveLoads++;}}});const finalAmp = 0.062 * finalActiveLoads;self.postMessage({devices: devices.map(d => ({ id: d.id, isON: d.isON, currentPosIndex: d.currentPosIndex, isPowered: d.isPowered })),wires: wires.map((w, idx) => ({ index: idx, isLive: isTerminalLive(w.fromNode.id, w.fromTerminal) })),brokenPins: brokenPins,totalAmp: finalAmp});}
