@@ -1,5 +1,6 @@
 let devices = [], wires = [], isSimulating = false;
 
+
 self.onmessage = function(e) {
     const { type, data } = e.data;
     if (type === 'INIT' || type === 'UPDATE') {
@@ -115,6 +116,10 @@ function run電位走査(mainPower, startIndex, keyProp) {
                 reachableLocalTerminals.push(curr.terminalIndex);
             }
         }
+        else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(currentDevice.type)) {
+            let pair = curr.terminalIndex === 0 ? 1 : 0;
+            reachableLocalTerminals.push(pair);
+        }
 
         reachableLocalTerminals.forEach(tIdx => {
             if (currentDevice.terminals[tIdx]) currentDevice.terminals[tIdx][keyProp] = true;
@@ -185,6 +190,8 @@ function runSequenceSimulation() {
                         if (idx === 8) opposingIdx = 4;
                         if (idx === 9) opposingIdx = 5;
                         if (idx === 10) opposingIdx = 6;
+                    } else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
+                        opposingIdx = idx === 0 ? 1 : 0;
                     }
                     if (opposingIdx !== -1 && d.terminals[opposingIdx] && !d.terminals[opposingIdx].isLive) {
                         brokenPins.push({ deviceId: d.id, terminalIndex: idx });
@@ -194,15 +201,4 @@ function runSequenceSimulation() {
         }
     });
 
-    let finalActiveLoads = 0;
-    devices.forEach(d => {
-        if (d.isPowered) {
-            if (d.type === 'relay' || d.type === 'contactor' || d.isLampElement || ['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {
-                finalActiveLoads++;
-            }
-        }
-    });
-    const finalAmp = 0.062 * finalActiveLoads;
-
-    self.postMessage({
-devices: devices.map(d => ({ id: d.id, isON: d.isON, currentPosIndex: d.currentPosIndex, isPowered: d.isPowered })),wires: wires.map((w, idx) => ({ index: idx, isLive: isTerminalLive(w.fromNode.id, w.fromTerminal) })),brokenPins: brokenPins,totalAmp: finalAmp});} 
+コードは注意してご使用ください。let finalActiveLoads = 0;devices.forEach(d => {if (d.isPowered) {if (d.type === 'relay' || d.type === 'contactor' || d.isLampElement || ['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) {finalActiveLoads++;}}});const finalAmp = 0.062 * finalActiveLoads;self.postMessage({devices: devices.map(d => ({ id: d.id, isON: d.isON, currentPosIndex: d.currentPosIndex, isPowered: d.isPowered })),wires: wires.map((w, idx) => ({ index: idx, isLive: isTerminalLive(w.fromNode.id, w.fromTerminal) })),brokenPins: brokenPins,totalAmp: finalAmp});}
