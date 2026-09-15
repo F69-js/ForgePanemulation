@@ -28,17 +28,23 @@ export const drawExteriorMap = [
         if (d.isPowered) ctx.restore();
     },
     (ctx, cx, cy, d) => { ctx.save(); ctx.translate(cx,cy); let ang = d.positions === 3 ? (d.currentPosIndex - 1) * 45 : (d.currentPosIndex === 1 ? 45 : -45); ctx.rotate(ang * Math.PI / 180); ctx.fillStyle='#111417'; ctx.beginPath(); ctx.arc(0,0,18,0,Math.PI*2); ctx.fill(); ctx.fillStyle = '#2d3436'; ctx.fillRect(-6, -20, 12, 34); ctx.fillStyle = '#ffffff'; ctx.fillRect(-2, -18, 4, 14); ctx.restore(); },
-    (ctx, cx, cy, d) => { ctx.save(); ctx.translate(cx,cy); let ang = d.positions === 3 ? (d.currentPosIndex - 1) * 45 : (d.currentPosIndex === 1 ? 45 : -45); ctx.rotate(ang * Math.PI / 180); if (d.isPowered) { ctx.shadowColor = d.color; ctx.shadowBlur = 15; } const lg = ctx.createRadialGradient(-3,-3,1,0,0,18); lg.addColorStop(0, d.isPowered?'#fff':adj(d.color,40)); lg.addColorStop(1,adj(d.color,-30)); ctx.fillStyle=lg; ctx.beginPath(); ctx.arc(0,0,18,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#111417'; ctx.fillRect(-7,-20,14,34); ctx.fillStyle=d.isPowered?adj(d.color,50):d.color; ctx.fillRect(-4,-18,8,30); ctx.restore(); },
+    (ctx, cx, cy, d) => { ctx.save(); ctx.translate(cx,cy); let ang = d.positions === 3 ? (d.currentPosIndex - 1) * 45 : (d.currentPosIndex === 1 ? 45 : -45); ctx.rotate(ang * Math.PI / 180); if (d.isPowered) { ctx.shadowColor = d.color; ctx.shadowBlur = 15; } const lg = ctx.createRadialGradient(-3,-3,1,0,0,18); lg.addColorStop(0, d.isPowered?'#fff':adj(d.color,40)); lg.addColorStop(1,adj(d.color,-30)); ctx.fillStyle=lg; ctx.beginPath(); ctx.arc(0,0,18,0,Math.PI*2); fill(); ctx.fillStyle='#111417'; ctx.fillRect(-7,-20,14,34); ctx.fillStyle=d.isPowered?adj(d.color,50):d.color; ctx.fillRect(-4,-18,8,30); ctx.restore(); },
     (ctx, cx, cy, d) => { ctx.save(); ctx.translate(cx,cy); if(d.isON) ctx.rotate(90 * Math.PI / 180); const kg = ctx.createLinearGradient(-15,-15,15,15); kg.addColorStop(0,'#dfe6e9'); kg.addColorStop(0.5,'#b2bec3'); kg.addColorStop(1,'#636e72'); ctx.fillStyle=kg; ctx.beginPath(); ctx.arc(0,0,18,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#2d3436'; ctx.fillRect(-2,-10,4,20); ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2); ctx.fill(); ctx.restore(); },
     (ctx, cx, cy, d) => { ctx.fillStyle=d.isPowered ? '#ff7675' : '#2d3436'; ctx.fillRect(d.x, d.y, 60, 60); ctx.fillStyle='#1e252b'; ctx.beginPath(); ctx.arc(cx,cy,20,0,Math.PI*2); ctx.fill(); ctx.strokeStyle=d.isPowered?'#e74c3c':'#111'; ctx.lineWidth=3; for(let i=-2;i<=2;i++){ ctx.beginPath(); ctx.moveTo(cx-14,cy+i*5); ctx.lineTo(cx+14,cy+i*5); ctx.stroke(); } },
     (ctx, cx, cy, d, totalAmp = 0) => { 
         ctx.fillStyle='#dcdde1'; ctx.fillRect(d.x,d.y,80,80); ctx.fillStyle='#fff'; ctx.fillRect(d.x+4,d.y+4,72,72); ctx.strokeStyle='#2c3e50'; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(cx,cy+25,45,Math.PI * 1.2,Math.PI * 1.8); ctx.stroke(); 
         for(let a=1.2; a<=1.8; a+=0.15){ ctx.beginPath(); ctx.moveTo(cx+Math.cos(Math.PI*a)*45,cy+25+Math.sin(Math.PI*a)*45); ctx.lineTo(cx+Math.cos(Math.PI*a)*40,cy+25+Math.sin(Math.PI*a)*40); ctx.stroke(); } 
         ctx.strokeStyle='#2d3436'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(cx,cy+25); 
-        let currentSwing = Math.min(totalAmp / 0.25, 1);
-        let targetAng = Math.PI * 1.25 + (Math.PI * 0.5 * currentSwing);
+        let meterUnit = d.unit || "A";
+        let swingProgress = 0;
+        if (meterUnit === "V" || meterUnit === "W") {
+            swingProgress = d.isPowered ? 1.0 : 0;
+        } else {
+            swingProgress = Math.min(totalAmp / 0.25, 1);
+        }
+        let targetAng = Math.PI * 1.25 + (Math.PI * 0.5 * swingProgress);
         ctx.lineTo(cx+Math.cos(targetAng)*38, cy+25+Math.sin(targetAng)*38); ctx.stroke(); 
-        ctx.fillStyle='#2f3542'; ctx.font='bold 12px sans-serif'; ctx.fillText(d.unit||"A",cx,cy+8); 
+        ctx.fillStyle='#2f3542'; ctx.font='bold 12px sans-serif'; ctx.fillText(meterUnit,cx,cy+8); 
     },
     (ctx, cx, cy, d) => { 
         ctx.fillStyle='#2f3542'; ctx.fillRect(d.x,d.y,72,72); ctx.fillStyle='#1e252b'; ctx.fillRect(d.x+4,d.y+4,64,40); 
