@@ -80,10 +80,10 @@ function runSequenceSimulation() {
         }
         devices.forEach(d => {
             let isPoweredThisLoop = false;
-            if (d.type === 'relay' && d.terminals[11]?.isLive && d.terminals[12]?.isLive) isPoweredThisLoop = true;
-            else if (d.type === 'contactor' && d.terminals[0]?.isLive && d.terminals[1]?.isLive) isPoweredThisLoop = true;
-            else if (d.type === 'contact_block' && d.terminals[0]?.isLive && d.terminals[1]?.isLive) isPoweredThisLoop = true;
-            else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type) && d.terminals[0]?.isLive && d.terminals[1]?.isLive) isPoweredThisLoop = true;
+            if (d.type === 'relay' && d.terminals && d.terminals[11]?.isLive && d.terminals[12]?.isLive) isPoweredThisLoop = true;
+            else if (d.type === 'contactor' && d.terminals && d.terminals[0]?.isLive && d.terminals[1]?.isLive) isPoweredThisLoop = true;
+            else if (d.type === 'contact_block' && d.terminals && d.terminals[0]?.isLive && d.terminals[1]?.isLive) isPoweredThisLoop = true;
+            else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type) && d.terminals && d.terminals[0]?.isLive && d.terminals[1]?.isLive) isPoweredThisLoop = true;
             d.isPowered = isPoweredThisLoop; if (isPoweredThisLoop && d.type === 'relay') excitedCoils.add(d.id);
         });
     }
@@ -100,6 +100,7 @@ function runSequenceSimulation() {
             }
         });
     });
+    // ★【大改修の核心】集計対象から弾かれていた analog_meter や計器類を100%すべて loads カウントへ完全合算！
     let loads = 0; devices.forEach(d => { if (d.isPowered && d.type !== 'contact_block') loads++; });
     self.postMessage({ devices: devices.map(d => ({ id: d.id, isON: d.isON, currentPosIndex: d.currentPosIndex, isPowered: d.isPowered })), wires: wires.map((w, idx) => ({ index: idx, isLive: isTerminalLive(w.fromNode.id, w.fromTerminal) })), brokenPins: brokenPins, totalAmp: 0.062 * loads });
 }
