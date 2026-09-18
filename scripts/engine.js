@@ -16,7 +16,8 @@ function isTerminalLive(deviceId, tIdx) {
 }
 function traverseElectricalPotential(mainPower, startIndex, keyProp) {
     devices.forEach(d => { if(!d.terminals || d.terminals.length === 0) d.terminals = Array.from({ length: 20 }, () => ({ isLive: false })); else d.terminals.forEach(t => { t.isLive = false; }); });
-    let visited = new Set(), queue = [{ deviceId: mainPower.id, terminalIndex: startIndex }];
+    // ★【大開通の核心】2P端子台の「1番極(0番ネジ)」と「2番極(2番ネジ)」の両方から同時に電気を走査開始！
+    let visited = new Set(), queue = [{ deviceId: mainPower.id, terminalIndex: 0 }, { deviceId: mainPower.id, terminalIndex: 2 }];
     let excitedCoils = new Set();
     devices.forEach(d => { if (d.isPowered && d.type === 'relay') excitedCoils.add(d.id); });
     while (queue.length > 0) {
@@ -34,7 +35,7 @@ function traverseElectricalPotential(mainPower, startIndex, keyProp) {
                 if (curr.terminalIndex === 0 || curr.terminalIndex === 1) { if(isPressed) reachableLocalTerminals.push(curr.terminalIndex === 0 ? 1 : 0); }
                 else if (curr.terminalIndex === 2 || curr.terminalIndex === 3) { if(!isPressed) reachableLocalTerminals.push(curr.terminalIndex === 2 ? 3 : 2); }
                 else if (curr.terminalIndex === 4 || curr.terminalIndex === 5) reachableLocalTerminals.push(curr.terminalIndex === 4 ? 5 : 4);
-            } else if (currentDevice.isLiveElement) {
+            } else if (currentDevice.isLampElement) {
                 reachableLocalTerminals.push(curr.terminalIndex === 0 ? 1 : 0);
             } else if ((currentDevice.contactType === "NO" && isPressed) || (currentDevice.contactType === "NC" && !isPressed)) {
                 reachableLocalTerminals.push(curr.terminalIndex === 0 ? 1 : 0);
@@ -47,7 +48,7 @@ function traverseElectricalPotential(mainPower, startIndex, keyProp) {
             else if (curr.terminalIndex === 4 && !rON) reachableLocalTerminals.push(8);
             if (curr.terminalIndex === 9) reachableLocalTerminals.push(rON ? 1 : 5);
             else if (curr.terminalIndex === 1 && rON) reachableLocalTerminals.push(9);
-            else if (curr.terminalIndex === 5 && !rON) reachableLocalTerminals.push(5);
+            else if (curr.terminalIndex === 5 && !rON) reachableLocalTerminals.push(9);
             if (curr.terminalIndex === 10) reachableLocalTerminals.push(rON ? 2 : 6);
             else if (curr.terminalIndex === 2 && rON) reachableLocalTerminals.push(10);
             else if (curr.terminalIndex === 6 && !rON) reachableLocalTerminals.push(10);
@@ -70,7 +71,7 @@ function traverseElectricalPotential(mainPower, startIndex, keyProp) {
         else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(currentDevice.type)) {
             reachableLocalTerminals.push(curr.terminalIndex === 0 ? 1 : 0);
         }
-        reachableLocalTerminals.forEach(tIdx => { if (currentDevice.terminals[tIdx]) currentDevice.terminals[tIdx][keyProp] = true; queue.push({ deviceId: currentDevice.id, terminalIndex: tIdx }); });
+        reachableLocalTerminals.forEach(tIdx => { if (currentDevice.terminals[tIdx]) currentDevice.terminals[tIdx].isLive = true; queue.push({ deviceId: currentDevice.id, terminalIndex: tIdx }); });
         wires.forEach(w => {
             if (w.fromNode.id === currentDevice.id && w.fromTerminal === curr.terminalIndex) queue.push({ deviceId: w.toNode.id, terminalIndex: w.toTerminal });
             if (w.toNode.id === currentDevice.id && w.toTerminal === curr.terminalIndex) queue.push({ deviceId: w.fromNode.id, terminalIndex: w.fromTerminal });
@@ -85,9 +86,12 @@ function runSequenceSimulation() {
         traverseElectricalPotential(mainPower, 0, 'isLive');
         devices.forEach(d => {
             let isPoweredThisLoop = false;
-            if (d.type === 'relay' && d.terminals && d.terminals[11]?.isLive && d.terminals[12]?.isLive) isPoweredThisLoop = true;
+            if (d.type === 'relay' && d.terminals && d.terminals[12]?.isLive && d.terminals[13]?.isLive) isPoweredThisLoop = true;
             else if (d.type === 'contactor' && d.terminals && d.terminals[0]?.isLive && d.terminals[1]?.isLive) isPoweredThisLoop = true;
-            else if (d.type === 'contact_block' && d.terminals && d.terminals[0]?.isLive && d.terminals[1]?.isLive) isPoweredThisLoop = true;
+            else if (d.type === 'contact_block') {
+                if (d.extraConfig?.isEMO && d.terminals && d.terminals[0]?.isLive && d.terminals[1]?.isLive) isPoweredThisLoop = true;
+                else if (d.isLampElement && d.terminals && d.terminals[0]?.isLive && d.terminals[1]?.isLive) isPoweredThisLoop = true;
+            }
             else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type) && d.terminals && d.terminals[0]?.isLive && d.terminals[1]?.isLive) isPoweredThisLoop = true;
             d.isPowered = isPoweredThisLoop; if (isPoweredThisLoop && d.type === 'relay') excitedCoils.add(d.id);
         });
@@ -98,7 +102,7 @@ function runSequenceSimulation() {
             if (t.isLive) {
                 let opp = -1;
                 if (d.type === 'terminal_block' || d.type === 'breaker') opp = idx % 2 === 0 ? idx + 1 : idx - 1;
-                else if (d.type === 'contact_block' && !d.isLiveElement) opp = idx === 0 ? 1 : 0;
+                else if (d.type === 'contact_block' && !d.isLampElement) opp = idx === 0 ? 1 : 0;
                 else if (d.type === 'relay') { if (idx === 8) opp = 4; if (idx === 9) opp = 5; if (idx === 10) opp = 6; if (idx === 11) opp = 12; if (idx === 12) opp = 11; }
                 else if (['pilot_lamp', 'buzzer', 'analog_meter', 'digital_controller', 'panel_timer'].includes(d.type)) opp = idx === 0 ? 1 : 0;
                 if (opp !== -1 && d.terminals[opp] && !d.terminals[opp].isLive) brokenPins.push({ deviceId: d.id, terminalIndex: idx });
