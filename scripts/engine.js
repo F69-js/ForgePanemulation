@@ -13,10 +13,20 @@ function resetAllStates() {
     self.postMessage({ devices: [], wires: [], brokenPins: [], totalAmp: 0 });
 }
 
+function isTerminalLive(deviceId, tIdx) {
+    const d = devices.find(dev => dev.id === deviceId);
+    return (d && d.terminals && d.terminals[tIdx]) ? d.terminals[tIdx].isLive : false;
+}
+
 function runSequenceSimulation() {
     devices.forEach(d => {
-        if(!d.terminals || d.terminals.length === 0) d.terminals = Array.from({ length: 20 }, () => ({ isLive: false }));
-        else d.terminals.forEach(t => { t.isLive = false; });
+        let poles = 2;
+        if (d.type === 'relay') poles = 14;
+        else if (d.type === 'terminal_block') poles = (d.extraConfig?.poles || 4) * 2;
+        else if (d.type === 'breaker') poles = (d.extraConfig?.poles || 3) * 2;
+        else if (d.type === 'contactor') poles = 12;
+        else if (d.type === 'contact_block' && d.extraConfig?.isEMO) poles = 6;
+        d.terminals = Array.from({ length: poles }, () => ({ isLive: false }));
     });
 
     const mainPower = devices.find(d => d.type === 'terminal_block' && (d.extraConfig?.isMainPower || d.name?.includes('端子台'))) || devices.find(d => d.type === 'terminal_block');
@@ -24,16 +34,14 @@ function runSequenceSimulation() {
 
     let excitedCoils = new Set();
 
-    for (let simStep = 0; simStep < 4; simStep++) {
+    for (let simStep = 0; simStep < 5; simStep++) {
         let pinToNodeMap = new Map();
-        let nodePotentials = [];
         let nodeCounter = 0;
 
         devices.forEach(d => {
             if(d.terminals) d.terminals.forEach((t, idx) => {
                 let nodeIndex = nodeCounter++;
                 pinToNodeMap.set(`${d.id}-${idx}`, nodeIndex);
-                nodePotentials[nodeIndex] = null;
             });
         });
 
@@ -55,7 +63,7 @@ function runSequenceSimulation() {
             if (d.type === 'terminal_block' || (d.type === 'breaker' && d.isON)) {
                 if (d.terminals) {
                     for (let i = 0; i < d.terminals.length; i += 2) {
-                        if (d.terminals[i] && d.terminals[i+1]) unionNodes(`${d.id}-${i}`, `${d.id}-${i+1}`);
+                        unionNodes(`${d.id}-${i}`, `${d.id}-${i+1}`);
                     }
                 }
             }
@@ -103,30 +111,29 @@ function runSequenceSimulation() {
             let dId = Number(dIdStr), tIdx = Number(tIdxStr);
             let dev = devices.find(device => device.id === dId);
             if (dev && dev.terminals && dev.terminals[tIdx]) {
-                if (nodeIdx === rNodeIdx) dev.terminals[tIdx].isLive = true;
+                if (nodeIdx === rNodeIdx || nodeIdx === nNodeIdx) dev.terminals[tIdx].isLive = true;
             }
         }
 
         devices.forEach(d => {
             let isPoweredThisLoop = false;
-            if (d.terminals && d.terminals[0] && d.terminals[1]) {
-                let node0 = pinToNodeMap.get(`${d.id}-0`);
-                let node1 = pinToNodeMap.get(`${d.id}-1`);
-                
-                if (d.type === 'relay') {
-                    let coilNode1 = pinToNodeMap.get(`${d.id}-12`);
-                    let coilNode2 = pinToNodeMap.get(`${d.id}-13`);
-                    if ((coilNode1 === rNodeIdx && coilNode2 === nNodeIdx) || (coilNode1 === nNodeIdx && coilNode2 === rNodeIdx)) isPoweredThisLoop = true;
-                }
-                else if (d.type === 'contact_block' && d.extraConfig?.isEMO) {
-                    let emoNode1 = pinToNodeMap.get(`${d.id}-4`);
-                    let emoNode2 = pinToNodeMap.get(`${d.id}-5`);
-                    if ((emoNode1 === rNodeIdx && emoNode2 === nNodeIdx) || (emoNode1 === nNodeIdx && emoNode2 === rNodeIdx)) isPoweredThisLoop = true;
-                }
-                else {
-                    if ((node0 === rNodeIdx && node1 === nNodeIdx) || (node0 === nNodeIdx && node1 === rNodeIdx)) isPoweredThisLoop = true;
-                }
+            let node0 = pinToNodeMap.get(`${d.id}-0`);
+            let node1 = pinToNodeMap.get(`${d.id}-1`);
+            
+            if (d.type === 'relay') {
+                let coilNode1 = pinToNodeMap.get(`${d.id}-12`);
+                let coilNode2 = pinToNodeMap.get(`${d.id}-13`);
+                if ((coilNode1 === rNodeIdx && coilNode2 === nNodeIdx) || (coilNode1 === nNodeIdx && coilNode2 === rNodeIdx)) isPoweredThisLoop = true;
             }
+            else if (d.type === 'contact_block' && d.extraConfig?.isEMO) {
+                let emoNode1 = pinToNodeMap.get(`${d.id}-4`);
+                let emoNode2 = pinToNodeMap.get(`${d.id}-5`);
+                if ((emoNode1 === rNodeIdx && emoNode2 === nNodeIdx) || (emoNode1 === nNodeIdx && emoNode2 === rNodeIdx)) isPoweredThisLoop = true;
+            }
+            else {
+                if ((node0 === rNodeIdx && node1 === nNodeIdx) || (node0 === nNodeIdx && node1 === rNodeIdx)) isPoweredThisLoop = true;
+            }
+            
             d.isPowered = isPoweredThisLoop;
             if (isPoweredThisLoop && d.type === 'relay') excitedCoils.add(d.id);
         });
@@ -142,9 +149,15 @@ function runSequenceSimulation() {
     });
 
     let loads = 0; devices.forEach(d => { if (d.isPowered && d.type !== 'contact_block') loads++; });
+    
     self.postMessage({
         devices: devices.map(d => ({ id: d.id, isON: d.isON, currentPosIndex: d.currentPosIndex, isPowered: d.isPowered })),
-        wires: wires.map((w, idx) => ({ index: idx, isLive: isTerminalLive(w.fromNode.id, w.fromTerminal) })),
+        wires: wires.map((w, idx) => {
+            let fromLive = false;
+            let targetD = devices.find(dev => dev.id === w.fromNode.id);
+            if (targetD && targetD.terminals && targetD.terminals[w.fromTerminal]) fromLive = targetD.terminals[w.fromTerminal].isLive;
+            return { index: idx, isLive: fromLive };
+        }),
         brokenPins: brokenPins,
         totalAmp: 0.062 * loads
     });
